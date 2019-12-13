@@ -4,6 +4,7 @@ app = Flask(__name__)
 @app.route('/visualize/<method>', methods=['GET'])
 def visualize(method):
     '''
+    1. check if
 
     :param method: umap/trimap/tsne
     :return: json with:
@@ -25,8 +26,10 @@ def visualize(method):
 
 @app.route('/set_params/', methods=['POST'])
 def set_params():
-    model_name = request.args.get('model_name')
-    model_version =request.args.get('model_version')
+    '''
+    1. write new params to db
+    :return:
+    '''
     method_params = request.get_json()
     return 200
 

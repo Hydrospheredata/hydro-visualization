@@ -4,35 +4,33 @@ Service for visualisation of high dimensional for hydrosphere
 
 ## API
 
-1. GET /visuzalize/transformer
-    transformer - manifold learning transformer from ["umap", "trimap", "tsne"]. For now only ["umap"].
+1. **GET**  `/visuzalize/{transformer}`, where 
+    transformer - manifold learning transformer from ["umap", "trimap", "tsne"]. For now only "umap" is available.
     
-    parameters:
+    input parameters:
     
-        - model_name
-        - model_version
+        - model_name: str
+        - model_version: int
         
     returns:
-        json with:
+        - data_shape: tuple(n_rows, n_dimensions)
+        - data: list
+        - class_labels
+            - ground_truth: list
+            - predicted: list
+            - confidences: list[float]
+        - anomaly_labels
+            - anomaly_labels: list[int]
+            - anomaly_confidence: list[float]
+        - top_100 neighbours indexes: list[list[int]]
         
-                - data_shape (N, n_dimensions)
-                - data
-                - class_labels
-                    - ground_truth
-                    - predicted
-                    - confidences
-                - anomaly_labels
-                    - anomaly_labels
-                    - anomaly_confidence
-                - top_100 neighbours indexes
-        
-2. POST /set_params
+2. **POST** `/set_params`
     
     parameters:
     
-        - model_name
-        - model_version
-        - json with parameters
+        - model_name: str
+        - model_version: int
+        - parameters: dict
     
     json format:
     ```json

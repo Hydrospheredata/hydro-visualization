@@ -1,49 +1,47 @@
 # hydro-vis
 Service for visualisation of high dimensional for hydrosphere
 
-
 ## API
-TODO 
-1. GET /plottable_embeddings/transformer
+
+1.**GET** /plottable_embeddings/transformer
     transformer - manifold learning transformer from ["umap", "trimap", "tsne"]. For now only ["umap"].
   
-     request json:   
-    ```json
-    {"model_name": "PACS",
-     "model_version": "1",
-     "data": { "bucket": "hydro-vis",
-               "requests_files": ["PACS/data/requests.csv"],
-               "profile_file": ""
-               }
-     }
-    ```
-    response json:
-    ```json
-   
-    {"data_shape": [1670, 2],
-     "data": '[3.1603233814,8.8767299652,2.7681264877, …]',
-     "class_labels": {
-                     "confidences": [0.1, 0.2, 0.3],
-                     "predicted": [1, 2, 1, 2],
-                     "ground_truth": [1, 1, 1, 2]
-                       },
-     "metrics": {
-                 "anomality": {
-                               "scores": [0.1, 0.2, 0.5, 0.2],
-                               "threshold": 0.5
-                               }
-                 },
-     "top_100": [[2, 3, 4], []],  
-     "visualization_metrics": {
-                               "global_score": 0.9,
-                               "sammon_error": 0.1,
-                               "msid_score": 200
-                               }
-    }
-
-    ```
+   request json:   
+```json
+{"model_name": "PACS",
+ "model_version": "1",
+ "data": { "bucket": "hydro-vis",
+           "requests_files": ["PACS/data/requests.csv"],
+           "profile_file": ""
+           }
+ }
+```
     
-2. POST /set_params
+   response json:
+```json
+{"data_shape": [1670, 2],
+ "data": "[3.1603233814,8.8767299652,2.7681264877, …]",
+ "class_labels": {
+                 "confidences": [0.1, 0.2, 0.3],
+                 "predicted": [1, 2, 1, 2],
+                 "ground_truth": [1, 1, 1, 2]
+                   },
+ "metrics": {
+             "anomality": {
+                           "scores": [0.1, 0.2, 0.5, 0.2],
+                           "threshold": 0.5
+                           }
+             },
+ "top_100": [[2, 3, 4], []],  
+ "visualization_metrics": {
+                           "global_score": 0.9,
+                           "sammon_error": 0.1,
+                           "msid_score": 200
+                           }
+}
+```
+    
+2. **POST** /set_params
   
     request format:
     ```json
@@ -74,6 +72,9 @@ TODO
 ### Demo
 1. set environment variables: AWS_ACCESS_KEY, AWS_SECRET_KEY
 2. send request 
+
+GET /plottable_embeddings/transformer 
+
 ```json
 {        "model_name": "PACS",
          "model_version": "1",

@@ -1,6 +1,11 @@
-Flask==1.1.1
+Flask
 numpy
-sklearn==0.0
-scikit-learn==0.22
+matplotlib
+pandas
+sklearn
+scikit-learn
 git+https://github.com/xgfs/msid.git
-
+boto3
+Pillow
+umap-learn
+loguru

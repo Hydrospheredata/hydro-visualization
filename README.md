@@ -70,7 +70,7 @@ Service for visualisation of high dimensional for hydrosphere
 4. Send embeddings, labels, confidence, top_100 neighbours
 
 
-### Demo
+## Demo
 1. set environment variables: AWS_ACCESS_KEY, AWS_SECRET_KEY
 2. send request 
 
@@ -85,3 +85,11 @@ GET /plottable_embeddings/transformer
                    }
          }
 ```
+
+### Time usage
+
+- receive embeddings 5s
+- transform embeddigns 2-4s
+- find 100 neighbours 5s
+
+Total request handling: 12-17s

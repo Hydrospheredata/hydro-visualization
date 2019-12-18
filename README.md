@@ -4,6 +4,7 @@ Service for visualisation of high dimensional for hydrosphere
 ## API
 
 1.**GET** /plottable_embeddings/transformer
+
     transformer - manifold learning transformer from ["umap", "trimap", "tsne"]. For now only ["umap"].
   
    request json:   

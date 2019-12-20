@@ -14,7 +14,8 @@ Service for visualisation of high dimensional for hydrosphere
  "data": { "bucket": "hydro-vis",
            "requests_files": ["PACS/data/requests.csv"],
            "profile_file": ""
-           }
+           },
+"visualization_metrics": ["global_score", "sammon_error", "auc_score", "stability_score", "msid", "clustering"]
  }
 ```
     
@@ -44,7 +45,7 @@ Service for visualisation of high dimensional for hydrosphere
     
 2. **POST** /set_params
   
-    request format:
+    **request format**:
     ```json
    {
    "model_name": "efficientnet",
@@ -53,10 +54,15 @@ Service for visualisation of high dimensional for hydrosphere
    "parameters": {"n_neighbours": 15,
                   "min_dist": 0.1,
                   "metric":  "cosine"},
-   "visualize_split": "train"
+   "use_labels": "true"
     }
     ```
-    response:
+   
+   - parameters: dict of transfomer parameters. Different set of parameters for different transformer used.
+   - use_labels: true if use ground truth labels from training data. Predicted labels from production data is not
+   used because this will generate false map. 
+   
+    **response**:
     200 - Success
     
 
@@ -82,8 +88,10 @@ GET /plottable_embeddings/transformer
          "data": { "bucket": "hydro-vis",
                    "requests_files": ["PACS/data/requests.csv"],
                    "profile_file": ""
-                   }
-         }
+                   },
+         "visualization_metrics": ["global_score", "sammon_error", "auc_score", "stability_score", "msid", "clustering"]
+}
+ 
 ```
 
 ### Time usage

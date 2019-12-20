@@ -13,7 +13,6 @@ class S3Manager:
         self.secret_key = os.getenv('AWS_SECRET_KEY', '')
         if self.access_key == '' or self.secret_key == '':
             logger.info('Access keys for S3 were not found')
-        print(self.access_key, self.secret_key)
         self.s3 = boto3.client('s3', aws_access_key_id=self.access_key, aws_secret_access_key=self.secret_key)
         self.s3 = boto3.client('s3')
 

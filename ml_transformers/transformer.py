@@ -1,9 +1,9 @@
 from .utils import AVAILABLE_TRANSFORMERS, DEFAULT_UMAP_PARAMETERS
 from abc import ABC, abstractmethod
-from .metrics import global_score, sammon_error, stability_score, auc_score, intristic_multiscale_score
+from .metrics import global_score, sammon_error, stability_score, auc_score, intristic_multiscale_score, clustering_score
 from loguru import logger
 from umap import UMAP
-
+from datetime import  datetime
 
 class Transformer(ABC):
     def __init__(self, parameters):
@@ -31,40 +31,38 @@ class Transformer(ABC):
         return None
 
     def eval(self, X, _X, y=None,
-             _use_global=True,
-             _use_sammon=True,
-             _use_auc=True,
-             _use_stability=True,
-             _use_msid=True,
+             evaluation_metrics=["global_score", "sammon_error",
+                                 "auc_score", "stability_score", "msid", "clustering"],
              _auc_cv=5):
         '''
-        Evaluates vizualization
-        :param X:
-        :param _X:
-        :param y:
-        :param _use_global:
-        :param _use_sammon:
-        :param _use_auc:
-        :param _use_stability:
-        :param _use_msid:
+        Evaluates vizualization using listed evaluation_metrics names
+        :param X: original points
+        :param _X: transformed points
+        :param y: labels
+        :param evaluation_metrics: list of metrics names
         :param _auc_cv: number of splits for acc evaluation
         :return: dict of metric values
         '''
+        start = datetime.now()
         eval_metrics = {}
-        if _use_global:
-            eval_metrics['global_score'] = global_score(X, _X)
-        if _use_sammon:
-            eval_metrics['sammon_error'] = sammon_error(X, _X)
-        if _use_auc and y is not None:
+        if 'global_score' in evaluation_metrics:
+            eval_metrics['global_score'] = str(global_score(X, _X))
+        if 'sammon_error' in evaluation_metrics:
+            eval_metrics['sammon_error'] = str(sammon_error(X, _X))
+        if 'auc_score' in evaluation_metrics and y is not None:
             acc_result = auc_score(_X, y)
-            eval_metrics['knn_acc'] = acc_result['knn_acc']
-            eval_metrics['svc_acc'] = acc_result['svc_acc']
-        if _use_stability:
-            eval_metrics['stability'] = stability_score(X, self.__instance__)
-        if _use_msid:
-            eval_metrics['msid'] = intristic_multiscale_score(X, _X)
+            eval_metrics['knn_acc'] = str(acc_result['knn_acc'])
+            eval_metrics['svc_acc'] = str(acc_result['svc_acc'])
+        if 'stability_score' in evaluation_metrics:
+            eval_metrics['stability'] = str(stability_score(X, self.__instance__))
+        if 'msid' in evaluation_metrics:
+            eval_metrics['msid'] = str(intristic_multiscale_score(X, _X))
+        if 'clustering' in evaluation_metrics and y is not None:
+            ars, ami = clustering_score(_X, y)
+            eval_metrics['clustering_random_score'] = str(ars)
+            eval_metrics['clustering_mutual_info'] = str(ami)
+        logger.info(f'Evaluation of embeddings took {datetime.now() - start}')
         return eval_metrics
-
 
 
 class UmapTransformer(Transformer):
@@ -85,7 +83,7 @@ class UmapTransformer(Transformer):
                            n_components=self.n_components,
                            min_dist=self.min_dist,
                            metric=self.metric)
-        __instance__ = UMAP(n_neighbors=self.n_neighbours,   # unfitted instance with same parameters for
+        __instance__ = UMAP(n_neighbors=self.n_neighbours,  # unfitted instance with same parameters for
                             n_components=self.n_components,  # stability metric
                             min_dist=self.min_dist,
                             metric=self.metric)

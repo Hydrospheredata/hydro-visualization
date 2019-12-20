@@ -1,3 +1,4 @@
+from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn import svm
@@ -13,6 +14,7 @@ import hdbscan
 def global_score(X, Y):
     """
     Global score
+    Source: https://github.com/eamid/trimap
     Input
     ------
     X: Instance matrix
@@ -76,9 +78,8 @@ def auc_score(X, y, cv=5, splits=None):
 def stability_score(X, method, sample_indeces=None, sample_size=0.1):
     '''
     Measures stabilty of embedding by subsampling from data, fitting sample and full data and measuring Procrustes distance
-    between two potentially comparable distributions
+    between two potentially comparable distributions. From https://arxiv.org/abs/1802.03426
     :param  X:
-    🍃
     :param transformer:
     :param sample_indeces:
     '''
@@ -92,7 +93,7 @@ def stability_score(X, method, sample_indeces=None, sample_size=0.1):
     sample_embs = method.fit_transform(sample)
     mtx1, mtx2, disparity = procrustes(embs[msk], sample_embs)
     avg_d = np.mean(np.linalg.norm(mtx1 - mtx2, axis=1))
-    return avg_d, disparity, mtx1, mtx2
+    return avg_d
 
 
 def sammon_error(X, _X, distance_metric=lambda x1, x2: np.linalg.norm(x1 - x2)):
@@ -126,7 +127,7 @@ def intristic_multiscale_score(X, _X):
     return msid_score(X, _X)
 
 
-def clustering_scores(_X, y):
+def clustering_score(_X, y):
     '''
     Computes 2 scores between clustering labeling and true labels:
         - adjusted_rand_score
@@ -136,9 +137,9 @@ def clustering_scores(_X, y):
     :param y:
     :return: adjusted_rand_score, mutual_info_score
     '''
-    labels = hdbscan.HDBSCAN().fit_predict(_X) # TODO kmeans?
+    n_clusters = len(np.unique(y))
+    kmeans = KMeans(n_clusters=n_clusters).fit(_X)
+    labels = kmeans.labels_
     mutual_info = adjusted_mutual_info_score(y, labels)
     rand_score = adjusted_rand_score(y, labels)
     return rand_score, mutual_info
-
-

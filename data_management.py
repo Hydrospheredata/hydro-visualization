@@ -40,16 +40,17 @@ def parse_requests_dataframe(df):
         - embeddings,
         - class prediction,
         - confidence,
-        - anomaly class, # TODO
-        - anomaly confidence # TODO
+        - other monitoring metrics and thresholds
     from requests dataframe
     :param df: dataframe
     :return: np.arrays
     '''
     predictions = np.array(df['prediction'])
     confidence = np.array(df['prob'])
-    embeddings = np.array([np.fromstring(df['embs'][i][1:-1], dtype=np.float32, sep=',') for i in range(len(df['embs']))])
+    embeddings = np.array(
+        [np.fromstring(df['embs'][i][1:-1], dtype=np.float32, sep=',') for i in range(len(df['embs']))])
     return embeddings, predictions, confidence, [], []
+
 
 def get_requests_data(bucket_name, requests_files):
     s3manager = S3Manager()
@@ -59,12 +60,12 @@ def get_requests_data(bucket_name, requests_files):
     anomaly_predictions = []
     anomaly_confidences = []
     for file in requests_files:
-        print(file, bucket_name)
         _, requests_df = s3manager.read_file(bucket_name=bucket_name, filename=file)
         if requests_df is None:
             logger.error(f'Could not get {bucket_name}:/{file}')
             continue
-        r_embeddings, r_predictions, r_confidences, r_anomaly_preds, r_anomaly_conf = parse_requests_dataframe(requests_df)
+        r_embeddings, r_predictions, r_confidences, r_anomaly_preds, r_anomaly_conf = parse_requests_dataframe(
+            requests_df)
         embeddings.append(r_embeddings)
         predictions.append(r_predictions)
         confidences.append(r_confidences)

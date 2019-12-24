@@ -101,3 +101,8 @@ GET /plottable_embeddings/transformer
 - find 100 neighbours 5s
 
 Total request handling: 12-17s
+
+# TODO
+-  [ ] manage parameters setting
+-  [ ] manage training data request
+-  [ ] manage fields of requests data

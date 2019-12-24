@@ -3,7 +3,20 @@ from data_management import S3Manager
 from loguru import logger
 from datetime import datetime
 from visualizer import visualize_high_dimensional
+import os
+from hydro_serving_grpc.reqstore import reqstore_client
+
 app = Flask(__name__)
+REQSTORE_URL = os.getenv("REQSTORE_URL", "managerui:9090")
+SERVING_URL = os.getenv("SERVING_URL", "managerui:9090")
+# hs_client = HydroServingClient(SERVING_URL)
+rs_client = reqstore_client.ReqstoreClient(REQSTORE_URL, insecure=True)
+
+
+@app.route("/", methods=['GET'])
+def hello():
+    return "Hi! I am Visualization service"
+
 
 @app.route('/plottable_embeddings/<method>', methods=['GET'])
 def transform(method):
@@ -55,8 +68,6 @@ def transform(method):
     return jsonify(result)
     # TODO database request
     # check transofrmer, and logic
-
-
 
 
 @app.route('/set_params/', methods=['POST'])

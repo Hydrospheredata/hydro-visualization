@@ -1,9 +1,11 @@
 from .utils import AVAILABLE_TRANSFORMERS, DEFAULT_UMAP_PARAMETERS
 from abc import ABC, abstractmethod
-from .metrics import global_score, sammon_error, stability_score, auc_score, intristic_multiscale_score, clustering_score
+from .metrics import global_score, sammon_error, stability_score, auc_score, intristic_multiscale_score, \
+    clustering_score
 from loguru import logger
 from umap import UMAP
-from datetime import  datetime
+from datetime import datetime
+
 
 class Transformer(ABC):
     def __init__(self, parameters):

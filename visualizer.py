@@ -8,7 +8,8 @@ import pandas as pd
 
 
 def visualize_high_dimensional(model_name, model_version, method, bucket, request_files=[], profile_file=[],
-                               vis_metrics=["global_score", "sammon_error", "auc_score", "stability_score", "msid", "clustering"]):
+                               vis_metrics=["global_score", "sammon_error", "auc_score", "stability_score", "msid",
+                                            "clustering"]):
     """
     Visualizes high dimensional data
     TODO add profile management, add outlier labels management, etc.
@@ -43,14 +44,15 @@ def visualize_high_dimensional(model_name, model_version, method, bucket, reques
         embeddings)  # TODO add ground truth labels management for semi-supervised umap
     logger.info(f'Fitting {embeddings.shape[0]} {embeddings.shape[1]}-dimensional points took {datetime.now() - start}')
 
-    vis_eval_metrics = ml_transformer.eval(embeddings, transformed_embeddings, y=None, evaluation_metrics=vis_metrics) # TODO add ground truth_labels
+    vis_eval_metrics = ml_transformer.eval(embeddings, transformed_embeddings, y=None,
+                                           evaluation_metrics=vis_metrics)  # TODO add ground truth_labels
     top_100_neighbours = get_top_100(embeddings)
     result['data_shape'] = transformed_embeddings.shape
     result['data'] = pd.Series(transformed_embeddings.flatten()).to_json(orient='values')
     result['class_labels'] = {'ground_truth': [],
                               'predicted': predictions.tolist(),
                               'confidences': confidences.tolist()}
-    result['metrics'] = {'anomality': {'scores':anomaly_confidences.tolist(),
+    result['metrics'] = {'anomality': {'scores': anomaly_confidences.tolist(),
                                        'threshold': 0.5}
                          }
     result['top_100'] = top_100_neighbours

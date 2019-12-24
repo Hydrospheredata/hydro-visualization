@@ -11,6 +11,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import adjusted_rand_score, adjusted_mutual_info_score
 import hdbscan
 
+
 def global_score(X, Y):
     """
     Global score
@@ -71,8 +72,6 @@ def auc_score(X, y, cv=5, splits=None):
         roc_auc = roc_auc_score(y_test, y_test_predicted)
     result['knn'] = {'acc': acc, 'roc_auc': roc_auc}
     return result
-
-
 
 
 def stability_score(X, method, sample_indeces=None, sample_size=0.1):

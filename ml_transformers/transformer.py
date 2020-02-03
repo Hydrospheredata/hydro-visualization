@@ -1,10 +1,13 @@
-from .utils import AVAILABLE_TRANSFORMERS, DEFAULT_UMAP_PARAMETERS
+import warnings
 from abc import ABC, abstractmethod
-from .metrics import global_score, sammon_error, stability_score, auc_score, intristic_multiscale_score, \
-    clustering_score
+from datetime import datetime
+
 from loguru import logger
 from umap import UMAP
-from datetime import datetime
+
+from .metrics import global_score, sammon_error, stability_score, auc_score, intristic_multiscale_score, \
+    clustering_score
+from .utils import DEFAULT_UMAP_PARAMETERS
 
 
 class Transformer(ABC):
@@ -92,6 +95,7 @@ class UmapTransformer(Transformer):
         return transformer, __instance__
 
     def fit(self, X, y=None):
+        warnings.filterwarnings('ignore')
         if y is None:
             self.transformer.fit(X)
         elif self.use_labels:
@@ -101,6 +105,7 @@ class UmapTransformer(Transformer):
         self.embedding_ = self.transformer.embedding_
 
     def fit_transform(self, X, y=None):
+        warnings.filterwarnings('ignore')
         if self.use_labels:
             _X = self.transformer.fit_transform(X, y)
         else:
@@ -109,5 +114,9 @@ class UmapTransformer(Transformer):
         return _X
 
     def transform(self, X, y=None):
-        _X = self.transformer.transform(X, y)
+        warnings.filterwarnings('ignore')
+        if self.use_labels or y is not None:
+            _X = self.transformer.transform(X, y)
+        else:
+            _X = self.transformer.transform(X)
         return _X

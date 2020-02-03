@@ -21,8 +21,9 @@ Service for visualisation of high dimensional for hydrosphere
     
    response json:
 ```json
-{"data_shape": [1670, 2],
- "data": "[3.1603233814,8.8767299652,2.7681264877, …]",
+{"data_shape": [2, 2],
+ "data": [[0.1, 0.2], [0.3, 0.4]],
+"request_ids": [200,2001],
  "class_labels": {
                  "confidences": [0.1, 0.2, 0.3],
                  "predicted": [1, 2, 1, 2],
@@ -31,7 +32,8 @@ Service for visualisation of high dimensional for hydrosphere
  "metrics": {
              "anomality": {
                            "scores": [0.1, 0.2, 0.5, 0.2],
-                           "threshold": 0.5
+                           "threshold": 0.5,
+                           "operation": ""
                            }
              },
  "top_100": [[2, 3, 4], []],  
@@ -41,6 +43,7 @@ Service for visualisation of high dimensional for hydrosphere
                            "msid_score": 200
                            }
 }
+
 ```
     
 2. **POST** /set_params
@@ -50,7 +53,6 @@ Service for visualisation of high dimensional for hydrosphere
    {
    "model_name": "efficientnet",
    "model_version": "12",
-   "transofmer": "umap",
    "parameters": {"n_neighbours": 15,
                   "min_dist": 0.1,
                   "metric":  "cosine"},
@@ -78,22 +80,62 @@ Service for visualisation of high dimensional for hydrosphere
 
 ## Demo
 1. set environment variables: AWS_ACCESS_KEY, AWS_SECRET_KEY
+2. upload demo/adult/model and demo/adult/monitoring_model
 2. send request 
 
 GET /plottable_embeddings/transformer 
 
 ```json
-{        "model_name": "PACS",
-         "model_version": "1",
+{        "model_name": "adult_scalar",
+         "model_version": 1,
          "data": { "bucket": "hydro-vis",
-                   "requests_files": ["PACS/data/requests.csv"],
-                   "profile_file": ""
+                   "requests_files": "adult/requests.parquet",
+                   "profile_file": "adult/training.parquet"
                    },
          "visualization_metrics": ["global_score", "sammon_error", "auc_score", "stability_score", "msid", "clustering"]
 }
  
+ 
 ```
 
+### Database schema 
+
+collection: visualization
+documents: key - model_name: model_version
+collection: umap, trimap, tsne
+```json
+{
+"model_name": "adult_scalar",
+"model_version": "1",
+"date_trained": "datetime",
+"embeddings_bucket_name": "hydro-vis",
+"transformed_embeddings": { "requests_files":  ["PACS/data/transformed/requests.csv"]},
+"parameters": {"n_neighbours": 15,
+                  "min_dist": 0.1,
+                  "metric":  "cosine"},
+"use_labels": false,
+"model": {"created": "",
+          "object":  ""} 
+}
+```
+transformed_embeddings - files that store transformed embeddings with labels and other monitoring numbers
+
+transformer structure
+```json
+{"name":  "umap",
+"date_created": "datetime",
+"transformed_embeddings": {"bucket_name": "hydro-vis",
+                            "requests_files":  ["PACS/data/transformed/requests.csv"]},
+"object": ""
+}
+```
+
+
+transformed embeddings file format:
+parquet
+
+label, confidence, transformed_embedding(vec), score1, score1_thresh, score2, score2_thresh, …
+ 
 ### Time usage
 
 - receive embeddings 5s
@@ -103,6 +145,16 @@ GET /plottable_embeddings/transformer
 Total request handling: 12-17s
 
 # TODO
--  [ ] manage parameters setting
+-  [x] manage parameters setting
 -  [ ] manage training data request
 -  [ ] manage fields of requests data
+
+- [ ] design convinient logic of extracting parameters and model from db
+- [ ] handle existing embeddings file
+- [ ] handle saving computed embeddings
+- [ ] handle extracting existing embeddings
+- [ ] handle comparison of computed and required requests
+- [ ] handle request_id
+
+
+

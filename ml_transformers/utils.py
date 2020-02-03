@@ -1,8 +1,9 @@
-from typing import List
 from datetime import datetime
-from scipy.spatial import cKDTree
+from typing import List
+
 import numpy as np
 from loguru import logger
+from scipy.spatial import cKDTree
 
 AVAILABLE_TRANSFORMERS = {'umap'}  # {'umap', 'tsne', 'trimap'}
 

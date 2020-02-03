@@ -1,16 +1,40 @@
-from flask import Flask, request, jsonify
-from data_management import S3Manager
-from loguru import logger
-from datetime import datetime
-from visualizer import visualize_high_dimensional
 import os
+from datetime import datetime
+
+from flask import Flask, request, jsonify
 from hydro_serving_grpc.reqstore import reqstore_client
+from loguru import logger
+from pymongo import MongoClient
+
+from client import HydroServingClient
+from data_management import S3Manager
+from data_management import get_record, deserialize, save_instance, get_training_embeddings, get_requests_data
+from visualizer import visualize_high_dimensional
 
 app = Flask(__name__)
 REQSTORE_URL = os.getenv("REQSTORE_URL", "managerui:9090")
 SERVING_URL = os.getenv("SERVING_URL", "managerui:9090")
-# hs_client = HydroServingClient(SERVING_URL)
+
+MONGO_URL = os.getenv("MONGO_URL", "localhost")
+MONGO_PORT = int(os.getenv("MONGO_PORT", 27017))
+MONGO_AUTH_DB = os.getenv("MONGO_AUTH_DB", "admin")
+MONGO_USER = os.getenv("MONGO_USER")
+MONGO_PASS = os.getenv("MONGO_PASS")
+
+hs_client = HydroServingClient(SERVING_URL)
 rs_client = reqstore_client.ReqstoreClient(REQSTORE_URL, insecure=True)
+
+
+def get_mongo_client():
+    return MongoClient(host=MONGO_URL, port=MONGO_PORT, maxPoolSize=200,
+                       username=MONGO_USER, password=MONGO_PASS,
+                       authSource=MONGO_AUTH_DB)
+
+
+mongo_client = get_mongo_client()
+
+db = mongo_client['visualization']
+s3manager = S3Manager()
 
 
 @app.route("/", methods=['GET'])
@@ -50,6 +74,7 @@ def transform(method):
                                "sammon_error": 0.1,
                                "msid_score": 200
                                }
+    "requests_ids": []
     }
     '''
     start = datetime.now()
@@ -61,23 +86,95 @@ def transform(method):
     requests_files = request_json.get('data', {})['requests_files']
     profile_file = request_json.get('data', {})['requests_files']
     vis_metrics = request_json.get('visualization_metrics', {})
-    result = visualize_high_dimensional(model_name, model_version, method,
-                                        bucket_name, requests_files, profile_file,
-                                        vis_metrics=vis_metrics)
+    db_record = get_record(db, method, model_name, model_version)
+    parameters = db_record.get('parameters', {})
+
+    model_record = db_record.get('model', {})
+    transformer_instance = None
+    try:
+        model = hs_client.get_model(model_name, model_version)
+        servable = hs_client.deploy_servable(model_name, model_version)
+    except ValueError as e:
+        return jsonify({"message": f"Unable to found {model_name}v{model_version}. Error: {e}"}), 404
+    if model_record:
+        transformer_instance = deserialize(model_record['object'])
+        logger.info('Model instance deserialized')
+
+    # get embeddings
+    training_df = s3manager.read_parquet(bucket_name=bucket_name, filename=profile_file)
+    requests_df = s3manager.read_parquet(bucket_name=bucket_name, filename=requests_files)
+    requests_data, requests_embeddings = get_requests_data(requests_df, model.monitoring_models())
+    logger.info(f'Parsed requests data {requests_embeddings.shape}')
+    training_embeddings = get_training_embeddings(model, servable, training_df)
+    logger.info(f'Parsed training data, result: {training_embeddings.shape}')
+    result, ml_transformer = visualize_high_dimensional(method, parameters,
+                                                        training_embeddings, requests_embeddings,
+                                                        transformer_instance,
+                                                        vis_metrics=vis_metrics)
+
+    result.update(requests_data)
     logger.info(f'Request handled in {datetime.now() - start}')
+    success = save_instance(db, method, model_name, model_version, ml_transformer)
+    servable.delete()
+    logger.info(f'Saving instance status: success:{success}')
     return jsonify(result)
-    # TODO database request
-    # check transofrmer, and logic
 
 
-@app.route('/set_params/', methods=['POST'])
-def set_params():
+@app.route('/set_params/<method>', methods=['POST'])
+def set_params(method):
     '''
     1. write new params to db
-    :return:
+    :return: 200
     '''
-    method_params = request.get_json()
-    return 200
+    logger.info("Received set params request")
+    request_json = request.get_json()
+    model_name = request_json['model_name']
+    model_version = request_json['model_version']
+    parameters = request_json['parameters']
+    use_labels = request_json.get('use_label', False)
+    status = set_record(db, model_name, model_version, method, parameters, use_labels)
+    return jsonify({}), 200, {"status": status}
+
+
+def set_record(db, model_name, model_version, method, parameters, use_labels):
+    '''
+    Create default record with parameters for transformer
+    if record exists, sets new parameters
+    :param db:
+    :param model_name:
+    :param model_version:
+    :param method:
+    :param parameters:
+    :param use_labels:
+    :return: status {created, existed, modified}
+    '''
+    status = "created"
+    new_method_record = {"model_name": model_name,
+                         "model_version": model_version,
+                         "embeddings_bucket_name": "",
+                         "transformed_files": {},
+                         "parameters": parameters,
+                         "use_labels": use_labels,
+                         "model": {}}
+    existing_record = db[method].find_one({"model_name": model_name,
+                                           "model_version": model_version})
+
+    if existing_record is not None:
+        existing_parameters = existing_record.get("parameters", {})
+        if parameters == existing_parameters:
+            logger.info("Transformer with same parameters already existed")
+            status = "existed"
+            return status
+        else:
+            db[method].update_one({"model_name": model_name,
+                                   "model_version": model_version}, {"$set": new_method_record})
+            logger.info("Transformer was modified")
+            status = "modified"
+            return status
+
+    db[method].insert_one(new_method_record)
+    return status
+
 
 if __name__ == "__main__":
     app.run(debug=True, host='0.0.0.0', port=5000)

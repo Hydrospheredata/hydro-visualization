@@ -3,6 +3,7 @@ Service for visualisation of high dimensional for hydrosphere
 
 ## DEPENDENCIES
 
+```python
 REQSTORE_URL = os.getenv("REQSTORE_URL", "managerui:9090")
 SERVING_URL = os.getenv("SERVING_URL", "managerui:9090")
 
@@ -11,6 +12,8 @@ MONGO_PORT = int(os.getenv("MONGO_PORT", 27017))
 MONGO_AUTH_DB = os.getenv("MONGO_AUTH_DB", "admin")
 MONGO_USER = os.getenv("MONGO_USER")
 MONGO_PASS = os.getenv("MONGO_PASS")
+```
+
 
 ## API
 
@@ -79,14 +82,6 @@ MONGO_PASS = os.getenv("MONGO_PASS")
     200 - Success
     
 
-### Visualize steps
-1. Get embeddings from model/db, get saved transformer
-    1. if there is none, create embeddings using model and default transformer
-2. Compare parameters with existing saved transformer
-    3. if differ fit new transformer
-    4. if no transformer existed before: create new
-3. If new requests are available, add them and refit transformer.
-4. Send embeddings, labels, confidence, top_100 neighbours
 
 
 ## Demo
@@ -155,17 +150,13 @@ label, confidence, transformed_embedding(vec), score1, score1_thresh, score2, sc
 
 Total request handling: 12-17s
 
-# TODO
--  [x] manage parameters setting
--  [ ] manage training data request
--  [ ] manage fields of requests data
-
-- [ ] design convinient logic of extracting parameters and model from db
-- [ ] handle existing embeddings file
-- [ ] handle saving computed embeddings
-- [ ] handle extracting existing embeddings
-- [ ] handle comparison of computed and required requests
-- [ ] handle request_id
-
+### Visualize steps
+1. Get embeddings from model/db, get saved transformer
+    1. if there is none, create embeddings using model and default transformer
+2. Compare parameters with existing saved transformer
+    3. if differ fit new transformer
+    4. if no transformer existed before: create new
+3. If new requests are available, add them and refit transformer.
+4. Send embeddings, labels, confidence, top_100 neighbours
 
 

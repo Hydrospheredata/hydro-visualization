@@ -1,0 +1,7 @@
+md5: 2dbc919ba4065ed9d576b98614ecdbe0
+outs:
+- md5: d8e2709fe3c3cf9cb08c48034d6f36df
+  path: classification_model.joblib
+  cache: true
+  metric: false
+  persist: false

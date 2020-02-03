@@ -1,6 +1,17 @@
 # hydro-vis
 Service for visualisation of high dimensional for hydrosphere
 
+## DEPENDENCIES
+
+REQSTORE_URL = os.getenv("REQSTORE_URL", "managerui:9090")
+SERVING_URL = os.getenv("SERVING_URL", "managerui:9090")
+
+MONGO_URL = os.getenv("MONGO_URL", "localhost")
+MONGO_PORT = int(os.getenv("MONGO_PORT", 27017))
+MONGO_AUTH_DB = os.getenv("MONGO_AUTH_DB", "admin")
+MONGO_USER = os.getenv("MONGO_USER")
+MONGO_PASS = os.getenv("MONGO_PASS")
+
 ## API
 
 1.**GET** /plottable_embeddings/transformer

@@ -108,6 +108,7 @@ def transform(method):
     requests_data, requests_embeddings = get_requests_data(requests_df, model.monitoring_models())
     logger.info(f'Parsed requests data {requests_embeddings.shape}')
     training_embeddings = get_training_embeddings(model, servable, training_df)
+
     logger.info(f'Parsed training data, result: {training_embeddings.shape}')
 
     result, ml_transformer = visualize_high_dimensional(method, parameters,

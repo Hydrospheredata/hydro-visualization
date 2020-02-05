@@ -17,7 +17,7 @@ def visualize_high_dimensional(method, parameters, training_embeddings, requests
     :param method: 'umap'
     :param request_files: list of S3 files with requests
     :param profile_file: list of S3 files of data profile
-    :return: json with points
+    :return: json with points if requests_embeddings are present, {}, None otherwise
     """
     result = {}
     ml_transformer = None
@@ -32,7 +32,13 @@ def visualize_high_dimensional(method, parameters, training_embeddings, requests
     if ml_transformer is None:
         logger.error('Cannot define transformer. Illegal method name')
 
-    total_embeddings = np.concatenate([training_embeddings, requests_embeddings])
+    if training_embeddings is not None and requests_embeddings is not None:
+        total_embeddings = np.concatenate([requests_embeddings, training_embeddings])
+    elif requests_embeddings is not None:
+        total_embeddings = requests_embeddings
+    else:
+        return {}, None
+
     start = datetime.now()
     if not need_fit and method == 'umap':
         transformed_embeddings = ml_transformer.transform(requests_embeddings)
@@ -46,7 +52,7 @@ def visualize_high_dimensional(method, parameters, training_embeddings, requests
     vis_eval_metrics = ml_transformer.eval(total_embeddings, transformed_embeddings, y=None,
                                            evaluation_metrics=vis_metrics)  # TODO add ground truth_labels
     top_100_neighbours = get_top_100(requests_embeddings)
-    transformed_embeddings = transformed_embeddings[:len(training_embeddings)]
+    transformed_embeddings = transformed_embeddings[:len(requests_embeddings)]
     result['data_shape'] = transformed_embeddings.shape
     result['data'] = transformed_embeddings.tolist()
     result['top_100'] = top_100_neighbours

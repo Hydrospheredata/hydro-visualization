@@ -8,13 +8,12 @@ import boto3
 import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq
-import requests
 import s3fs
 from bson.binary import Binary
 from loguru import logger
 from tqdm import tqdm
 
-from client import HydroServingClient, HydroServingModel, HydroServingServable
+from client import HydroServingModel, HydroServingServable
 
 
 class S3Manager:
@@ -64,6 +63,7 @@ def parse_requests_dataframe(df, monitoring_fields) -> (Dict, np.ndarray):
                  "anomality": {
                                "scores": [0.1, 0.2, 0.5, 0.2],
                                "threshold": 0.5
+                               "operation": "Grater"
                                }
                  }
     }
@@ -101,16 +101,6 @@ def get_requests_data(requests_df, monitoring_fields) -> Dict:
     return parse_requests_dataframe(requests_df, monitoring_fields)
 
 
-def model_exists(db, method, model_name, model_version):
-    existing_record = db[method].find_one({"model_name": model_name,
-                                           "model_version": model_version})
-    if existing_record is not None:
-        model_record = existing_record.get('model', {})
-        if model_record:
-            return True
-    return False
-
-
 def get_pretrained_files(db, method, model_name, model_version):
     existing_record = db[method].find_one({"model_name": model_name,
                                            "model_version": model_version})
@@ -118,8 +108,6 @@ def get_pretrained_files(db, method, model_name, model_version):
     if existing_record is not None:
         model_record = existing_record.get('model', {})
         model_object = deserialize(model_record['object'])
-        transformed_emb_files = model_record['transformed_embeddings']  # TODO
-        # if transformed_emb_files:
         return model_object
     return None
 
@@ -146,33 +134,6 @@ def save_instance(db, method, model_name, model_version, instance)->bool:
     logger.info(f'saved serialized model')
     return True
 
-
-def get_record_status(db, method, model_name, model_version):
-    '''
-    returns info about:
-     - if db already has info about model
-     - if there is pretrained model in db
-    :param db:
-    :param method:
-    :param model_name:
-    :param model_version:
-    :return: {record: True, model: True}
-    '''
-    status = {}
-    existing_record = db[method].find_one({"model_name": model_name,
-                                           "model_version": model_version})
-    if existing_record is not None:
-        status['record'] = True
-        model_record = existing_record.get('model', {})
-        if model_record:
-            status['model'] = True
-        else:
-            status['model'] = False
-    else:
-        status['record'] = False
-        status['model'] = False
-
-
 def serialize(obj):
     '''
     Serializes object to write it to database
@@ -191,24 +152,15 @@ def deserialize(bytes_str):
     return pickle.loads(bytes_str)
 
 
-def get_model_monitoring_fields(model_name, model_version, hs_client: HydroServingClient):
-    try:
-        model = hs_client.get_model(model_name, model_version)
-    except ValueError:  # no such model
-        print('Value Error')
-        return []
-    model_id = model.id
-    request_url = hs_client.url.split(':')[0]
-    monitoring_response = requests.get(f'https://{request_url}/api/v2/monitoring/metricspec/modelversion/{model_id}')
-    if monitoring_response.status_code == 200:
-        return list(map(lambda x: x['name'], monitoring_response.json()))
-    else:
-
-        return []
-
-
 def get_training_embeddings(model: HydroServingModel, servable: HydroServingServable,
                             training_data: pd.DataFrame) -> [np.ndarray, None]:
+    '''
+    Computes embeddings from training data using model servable
+    :param model:
+    :param servable:
+    :param training_data: Dataframe with data
+    :return: np.ndarray with embeddings or None if failed
+    '''
     output_names = list(map(lambda x: x['name'], model.contract.contract_dict['outputs']))
     input_names = list(map(lambda x: x['name'], model.contract.contract_dict['inputs']))
     if 'embedding' not in output_names:

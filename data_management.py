@@ -77,10 +77,10 @@ def parse_requests_dataframe(df, monitoring_fields) -> (Dict, np.ndarray):
         confidence = df['confidence'].values.tolist()
     requests_ids = df['request_id'].values.tolist()
     embeddings = np.apply_along_axis(lambda x: np.array(x), arr=df['embedding'].values.tolist(), axis=0)
-    for monitoring_name in monitoring_fields:
+    for (monitoring_name, comp_operator) in monitoring_fields:
         scores = np.array(df[monitoring_name])
         thresholds = np.array(df[f'{monitoring_name}_threshold'])
-        monitoring[monitoring_name] = {'scores': scores.tolist(), 'threshold': thresholds[0]}  # taking last threshold
+        monitoring[monitoring_name] = {'scores': scores.tolist(), 'threshold': thresholds[0], 'operation': comp_operator}  # taking last threshold
     class_info = {'class': predictions, 'confidence': confidence}
     return {'class_labels': class_info, 'metrics': monitoring, 'requests_ids': requests_ids}, embeddings
 
@@ -132,7 +132,7 @@ def get_record(db, method, model_name, model_version):
     return existing_record
 
 
-def save_instance(db, method, model_name, model_version, instance):
+def save_instance(db, method, model_name, model_version, instance)->bool:
     existing_record = db[method].find_one({"model_name": model_name,
                                            "model_version": model_version})
     if existing_record is None:

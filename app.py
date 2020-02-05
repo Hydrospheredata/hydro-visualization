@@ -8,7 +8,7 @@ from pymongo import MongoClient
 
 from client import HydroServingClient
 from data_management import S3Manager
-from data_management import get_record, deserialize, save_instance, get_training_embeddings, get_requests_data
+from data_management import get_record, deserialize, get_training_embeddings, get_requests_data
 from visualizer import visualize_high_dimensional
 
 app = Flask(__name__)
@@ -49,8 +49,8 @@ def transform(method):
     {"model_name": "PACS",
      "model_version": "1",
      "data": { "bucket": "hydro-vis",
-               "requests_files": ["PACS/data/requests.csv"],
-               "profile_file": ""
+               "requests_file": "PACS/data/requests.parquet",
+               "profile_file": "PACS/data/requests.parquet",
                },
     "visualization_metrics": ["global_score", "sammon_error", "auc_score", "stability_score", "msid", "clustering"]
      }
@@ -83,30 +83,33 @@ def transform(method):
     model_name = request_json['model_name']
     model_version = request_json['model_version']
     bucket_name = request_json.get('data', {})['bucket']
-    requests_files = request_json.get('data', {})['requests_files']
-    profile_file = request_json.get('data', {})['requests_files']
+    requests_file = request_json.get('data', {})['requests_file']
+    profile_file = request_json.get('data', {})['profile_file']
     vis_metrics = request_json.get('visualization_metrics', {})
-    db_record = get_record(db, method, model_name, model_version)
-    parameters = db_record.get('parameters', {})
 
-    model_record = db_record.get('model', {})
-    transformer_instance = None
     try:
         model = hs_client.get_model(model_name, model_version)
         servable = hs_client.deploy_servable(model_name, model_version)
     except ValueError as e:
         return jsonify({"message": f"Unable to found {model_name}v{model_version}. Error: {e}"}), 404
+    except Exception as e:
+        return  jsonify({"message": f"Error creating model {model_name}v{model_version}. Error: {e}"}), 500
+
+    db_record = get_record(db, method, model_name, str(model_version))
+    parameters = db_record.get('parameters', {})
+    model_record = db_record.get('model', {})
+    transformer_instance = None
     if model_record:
         transformer_instance = deserialize(model_record['object'])
         logger.info('Model instance deserialized')
 
-    # get embeddings
     training_df = s3manager.read_parquet(bucket_name=bucket_name, filename=profile_file)
-    requests_df = s3manager.read_parquet(bucket_name=bucket_name, filename=requests_files)
+    requests_df = s3manager.read_parquet(bucket_name=bucket_name, filename=requests_file)
     requests_data, requests_embeddings = get_requests_data(requests_df, model.monitoring_models())
     logger.info(f'Parsed requests data {requests_embeddings.shape}')
     training_embeddings = get_training_embeddings(model, servable, training_df)
     logger.info(f'Parsed training data, result: {training_embeddings.shape}')
+
     result, ml_transformer = visualize_high_dimensional(method, parameters,
                                                         training_embeddings, requests_embeddings,
                                                         transformer_instance,
@@ -114,9 +117,9 @@ def transform(method):
 
     result.update(requests_data)
     logger.info(f'Request handled in {datetime.now() - start}')
-    success = save_instance(db, method, model_name, model_version, ml_transformer)
+    # success = save_instance(db, method, model_name, str(model_version), ml_transformer)
+    # logger.info(f'Saving instance status: success:{success}')
     servable.delete()
-    logger.info(f'Saving instance status: success:{success}')
     return jsonify(result)
 
 

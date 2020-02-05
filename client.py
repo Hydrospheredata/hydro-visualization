@@ -105,14 +105,14 @@ class HydroServingModel:
     def monitoring_models(self):
         '''
         Gets summary about models inputs, outputs, monitoring inputs, outputs, thresholds
-        :return: [str]
+        :return: [(monitoring_name, operator)]
         '''
         model_id = self.id
         request_url = self.__hs_client.url.split(':')[0]
         monitoring_response = requests.get(
             f'http://{request_url}:80/api/v2/monitoring/metricspec/modelversion/{model_id}')
         if monitoring_response.status_code == 200:
-            return list(map(lambda x: x['name'], monitoring_response.json()))
+            return list(map(lambda x: (x['name'], x['config']['thresholdCmpOperator']['kind']), monitoring_response.json()))
         else:
 
             return []

@@ -51,17 +51,6 @@ def visualize_high_dimensional(method, parameters, training_embeddings, requests
     result['data'] = transformed_embeddings.tolist()
     result['top_100'] = top_100_neighbours
     result['visualization_metrics'] = vis_eval_metrics
+    ml_transformer.embedding_ = None
     return result, ml_transformer
 
-
-def get_transformer_parameters(model_name, model_version, bucket):
-    """
-    TODO
-    Searchers for parameters json on bucket, if found uses new parameters, else uses default
-    :param model_name:
-    :param model_version:
-    :param bucket:
-    :return: dict with parameters or empty
-    """
-
-    return {}

@@ -23,14 +23,16 @@ MONGO_PASS = os.getenv("MONGO_PASS")
   
    request json:   
 ```json
-{"model_name": "PACS",
- "model_version": "1",
- "data": { "bucket": "hydro-vis",
-           "requests_files": ["PACS/data/requests.csv"],
-           "profile_file": ""
-           },
-"visualization_metrics": ["global_score", "sammon_error", "auc_score", "stability_score", "msid", "clustering"]
- }
+{        "model_name": "adult_scalar",
+         "model_version": 1,
+         "data": { "bucket": "hydro-vis",
+                   "requests_files": "adult/requests.parquet",
+                   "profile_file": "adult/training.parquet"
+                   },
+         "visualization_metrics": ["global_score", "sammon_error", "auc_score", "stability_score", "msid", "clustering"]
+}
+ 
+ 
 ```
     
    response json:

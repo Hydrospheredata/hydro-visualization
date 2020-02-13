@@ -4,6 +4,8 @@ Service for visualisation of high dimensional for hydrosphere
 ## DEPENDENCIES
 
 ```python
+DEBUG_ENV = bool(os.getenv("DEBUG_ENV", True))
+
 REQSTORE_URL = os.getenv("REQSTORE_URL", "managerui:9090")
 SERVING_URL = os.getenv("SERVING_URL", "managerui:9090")
 
@@ -14,6 +16,11 @@ MONGO_USER = os.getenv("MONGO_USER")
 MONGO_PASS = os.getenv("MONGO_PASS")
 ```
 
+## Assumptions:
+
+- Model must have in it's contract **'embedding'** output
+- If model returns class prediction and confidence these fields should be named **'class'** and **'confidence'** respectively
+- Only data (embeddings) from requests will be visualized. Training data is used only for accurate transformation. 
 
 ## API
 
@@ -42,8 +49,7 @@ MONGO_PASS = os.getenv("MONGO_PASS")
 "request_ids": [200,2001],
  "class_labels": {
                  "confidences": [0.1, 0.2, 0.3],
-                 "predicted": [1, 2, 1, 2],
-                 "ground_truth": [1, 1, 1, 2]
+                 "predicted": [1, 2, 1, 2]
                    },
  "metrics": {
              "anomality": {
@@ -61,7 +67,8 @@ MONGO_PASS = os.getenv("MONGO_PASS")
 }
 
 ```
-    
+
+  
 2. **POST** /set_params
   
     **request format**:

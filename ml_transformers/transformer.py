@@ -1,8 +1,10 @@
 import warnings
 from abc import ABC, abstractmethod
 from datetime import datetime
+from typing import Dict
 
-from loguru import logger
+import numpy as np
+from loguru import logger as logging
 from umap import UMAP
 
 from .metrics import global_score, sammon_error, stability_score, auc_score, intristic_multiscale_score, \
@@ -11,12 +13,12 @@ from .utils import DEFAULT_PARAMETERS
 
 
 class Transformer(ABC):
-    def __init__(self, parameters):
+    def __init__(self, parameters: Dict):
         self.__set_params__(parameters)
         self.__instance__, self.transformer = self.__create__()  # clear instance of transformer (not fitted into data)
 
     @abstractmethod
-    def __set_params__(self, parameters):
+    def __set_params__(self, parameters: Dict):
         pass
 
     @abstractmethod
@@ -24,21 +26,21 @@ class Transformer(ABC):
         return None, None
 
     @abstractmethod
-    def fit(self, X, y=None):
-        return None, None
+    def fit(self, X: np.ndarray, y=None):
+        pass
 
     @abstractmethod
-    def transform(self, X, y=None):
-        return None, None
-
-    @abstractmethod
-    def fit_transform(self, X, y=None):
+    def transform(self, X: np.ndarray, y=None) -> np.ndarray:
         return None
 
-    def eval(self, X, _X, y=None,
+    @abstractmethod
+    def fit_transform(self, X: np.ndarray, y=None) -> np.ndarray:
+        return None
+
+    def eval(self, X: np.ndarray, _X: np.ndarray, y=None,
              evaluation_metrics=["global_score", "sammon_error",
                                  "auc_score", "stability_score", "msid", "clustering"],
-             _auc_cv=5):
+             _auc_cv=5) -> Dict[str, str]:
         '''
         Evaluates vizualization using listed evaluation_metrics names
         :param X: original points
@@ -66,7 +68,7 @@ class Transformer(ABC):
             ars, ami = clustering_score(_X, y)
             eval_metrics['clustering_random_score'] = str(ars)
             eval_metrics['clustering_mutual_info'] = str(ami)
-        logger.info(f'Evaluation of embeddings took {datetime.now() - start}')
+        logging.info(f'Evaluation of embeddings took {datetime.now() - start}')
         return eval_metrics
 
 

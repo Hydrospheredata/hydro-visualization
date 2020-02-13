@@ -13,7 +13,7 @@ import pandas as pd
 import pyarrow.parquet as pq
 import s3fs
 from bson.binary import Binary
-from loguru import logger
+from loguru import logger as logging
 from tqdm import tqdm
 
 from client import HydroServingModel, HydroServingServable
@@ -26,7 +26,7 @@ class S3Manager:
         self.access_key = os.getenv('AWS_ACCESS_KEY', '')
         self.secret_key = os.getenv('AWS_SECRET_KEY', '')
         if self.access_key == '' or self.secret_key == '':
-            logger.info('Access keys for S3 were not found')
+            logging.info('Access keys for S3 were not found')
         self.s3 = boto3.client('s3', aws_access_key_id=self.access_key, aws_secret_access_key=self.secret_key)
         self.s3 = boto3.client('s3')
         self.fs = s3fs.S3FileSystem()
@@ -51,13 +51,13 @@ class S3Manager:
         try:
             df.to_parquet(f's3://{bucket_name}/{filename}')
         except Exception as e:
-            logger.error(f'Couldn\'t write {filename} to {bucket_name} bucket. Error: {e}')
+            logging.error(f'Couldn\'t write {filename} to {bucket_name} bucket. Error: {e}')
 
     def write_json(self, data: Dict, bucket_name: str, filename: str) -> bool:
         try:
             self.s3.put_object(Bucket=bucket_name, Body=json.dumps(data), Key=filename)
         except Exception as e:
-            logger.error(f'Couldn\'t write json to {bucket_name} bucket. Error: {e}')
+            logging.error(f'Couldn\'t write json to {bucket_name} bucket. Error: {e}')
             return False
         return True
 
@@ -65,13 +65,13 @@ class S3Manager:
         try:
             response = self.s3.get_object(Bucket=bucket_name, Key=filename)
         except Exception as e:
-            logger.error(f'Couldn\'t request {bucket_name} bucket. Error: {e}')
+            logging.error(f'Couldn\'t request {bucket_name} bucket. Error: {e}')
             return {}
         object_body = response['Body']
         try:
             content = json.loads(object_body.read())
         except Exception as e:
-            logger.error(f'Couldn\'t read {bucket_name}:{filename} file as json file. Error: {e}')
+            logging.error(f'Couldn\'t read {bucket_name}:{filename} file as json file. Error: {e}')
             return {}
         return content
 
@@ -79,7 +79,7 @@ class S3Manager:
         try:
             response = self.s3.list_objects(Bucket=bucket_name)
         except Exception as e:
-            logger.error(f'Couldn\'t request {bucket_name} bucket. Error: {e}')
+            logging.error(f'Couldn\'t request {bucket_name} bucket. Error: {e}')
             return False
         files = list(map(lambda x: x.get('Key', ''), response.get('Contents', [{}])))
         if filename in files:
@@ -93,7 +93,7 @@ class S3Manager:
                 fp.seek(0)
                 self.s3.put_object(Body=fp.read(), Bucket=bucket_name, Key=filename)
         except Exception as e:
-            logger.error(f'Couldn\'t write transformer to {bucket_name}/{filename} bucket. Error: {e}')
+            logging.error(f'Couldn\'t write transformer to {bucket_name}/{filename} bucket. Error: {e}')
             return False
         return True
 
@@ -105,7 +105,7 @@ class S3Manager:
         :return: transofrmer or None (if file doesn't exist)
         '''
         if not self.file_exists(bucket_name, filename):
-            logger.error('Transformer doesn\'t exists')
+            logging.error('Transformer doesn\'t exists')
             return None
         with tempfile.TemporaryFile() as fp:
             self.s3.download_fileobj(Fileobj=fp, Bucket=bucket_name, Key=filename)
@@ -166,7 +166,7 @@ def get_requests_data(requests_df: pd.DataFrame, monitoring_fields) -> Dict:
     '''
 
     if 'embedding' not in requests_df.columns:
-        logger.error(f'No "embedding" field')
+        logging.error(f'No "embedding" field')
         return None
 
     return parse_requests_dataframe(requests_df, monitoring_fields)
@@ -210,11 +210,11 @@ def save_record(db, method: str, record: Dict):
     existing_record = db[method].find_one({"model_name": model_name,
                                            "model_version": model_version})
     if existing_record:
-        logger.info('Record existed!')
+        logging.info('Record existed!')
         db[method].update_one({"model_name": model_name,
                                "model_version": model_version}, {"$set": record})
     else:
-        logger.info('Saving new record')
+        logging.info('Saving new record')
         db[method].insert_one(record)
 
 
@@ -229,7 +229,7 @@ def save_instance(db, method, model_name, model_version, instance) -> bool:
     existing_record['model'] = model_record
     db[method].update_one({"model_name": model_name,
                            "model_version": model_version}, {"$set": existing_record})
-    logger.info(f'saved serialized model')
+    logging.info(f'saved serialized model')
     return True
 
 
@@ -261,7 +261,7 @@ def get_training_embeddings(model: HydroServingModel, servable: HydroServingServ
     :return: np.ndarray with embeddings or None if failed
     '''
     if 'embedding' in training_data.columns:
-        logger.info('Training embeddings exist')
+        logging.info('Training embeddings exist')
         embs = np.stack(training_data['embedding'].values)
         return embs
     output_names = list(map(lambda x: x['name'], model.contract.contract_dict['outputs']))
@@ -274,7 +274,7 @@ def get_training_embeddings(model: HydroServingModel, servable: HydroServingServ
             f'Input fields ({input_names}) are not compatible with data fields ({set(training_data.columns)})')
     inputs = training_data[input_names]
     embeddings = []
-    logger.info('Embedding inference: ')
+    logging.info('Embedding inference: ')
     for i in tqdm(range(len(inputs))):
         outputs = servable(inputs.iloc[i])
         embeddings.append(outputs['embedding'])

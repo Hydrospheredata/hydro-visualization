@@ -2,8 +2,8 @@ import os
 from datetime import datetime
 
 from flask import Flask, request, jsonify
-from hydro_serving_grpc.reqstore import reqstore_client
-from loguru import logger
+from flask_cors import CORS
+from loguru import logger as logging
 from pymongo import MongoClient
 
 from client import HydroServingClient
@@ -13,6 +13,10 @@ from ml_transformers.utils import DEFAULT_PARAMETERS
 from visualizer import visualize_high_dimensional
 
 app = Flask(__name__)
+CORS(app, expose_headers=['location'])
+
+DEBUG_ENV = bool(os.getenv("DEBUG_ENV", True))
+
 REQSTORE_URL = os.getenv("REQSTORE_URL", "managerui:9090")
 SERVING_URL = os.getenv("SERVING_URL", "managerui:9090")
 
@@ -23,7 +27,6 @@ MONGO_USER = os.getenv("MONGO_USER")
 MONGO_PASS = os.getenv("MONGO_PASS")
 
 hs_client = HydroServingClient(SERVING_URL)
-rs_client = reqstore_client.ReqstoreClient(REQSTORE_URL, insecure=True)
 
 
 def get_mongo_client():
@@ -46,41 +49,15 @@ def hello():
 @app.route('/plottable_embeddings/<method>', methods=['GET'])
 def transform(method):
     '''
+    transforms model training and requests embedding data to lower space for visualiztion (100D to 2D)
+    using manifold learning techniques
     :param method: umap/trimap/tsne
-    {"model_name": "PACS",
-     "model_version": "1",
-     "data": { "bucket": "hydro-vis",
-               "requests_file": "PACS/data/requests.parquet",
-               "profile_file": "PACS/data/requests.parquet",
-               },
-    "visualization_metrics": ["global_score", "sammon_error", "auc_score", "stability_score", "msid", "clustering"]
-     }
-    :return:
-    {"data_shape": [1670, 2],
-     "data": "[3.1603233814,8.8767299652,2.7681264877, …]",
-     "class_labels": {
-                     "confidences": [0.1, 0.2, 0.3],
-                     "predicted": [1, 2, 1, 2],
-                     "ground_truth": [1, 1, 1, 2]
-                       },
-     "metrics": {
-                 "anomality": {
-                               "scores": [0.1, 0.2, 0.5, 0.2],
-                               "threshold": 0.5
-                               }
-                 },
-     "top_100": [[2, 3, 4], []],
-     "visualization_metrics": {
-                               "global_score": 0.9,
-                               "sammon_error": 0.1,
-                               "msid_score": 200
-                               }
-    "requests_ids": []
-    }
+            request body: see README
+            response body: see README
     '''
     start = datetime.now()
     request_json = request.get_json()
-    logger.info(f'Received request: {request_json}')
+    logging.info(f'Received request: {request_json}')
     model_name = request_json.get('model_name', '')
     model_version = request_json.get('model_version', '')
     bucket_name = request_json.get('data', {}).get('bucket', '')
@@ -96,11 +73,11 @@ def transform(method):
     except Exception as e:
         return jsonify({"message": f"Error creating model {model_name}v{model_version}. Error: {e}"}), 500
 
-    db_record = get_record(db, method, model_name, str(model_version))
-    parameters = db_record.get('parameters', {})
-    results_bucket = db_record.get('embeddings_bucket_name', '')
-    transfomer_path = db_record.get('transformer_file', '')
-    result_path = db_record.get('result_file', '')
+    db_model_info = get_record(db, method, model_name, str(model_version))
+    parameters = db_model_info.get('parameters', {})
+    results_bucket = db_model_info.get('embeddings_bucket_name', '')
+    transfomer_path = db_model_info.get('transformer_file', '')
+    result_path = db_model_info.get('result_file', '')
     if result_path:
         result = s3manager.read_json(bucket_name=results_bucket, filename=result_path)
         return result
@@ -114,9 +91,9 @@ def transform(method):
     requests_data, requests_embeddings = get_requests_data(requests_df, model.monitoring_models())
     if requests_embeddings is None:
         return jsonify({"message": f"Unable to get requests embeddings from {requests_file}"}), 404
-    logger.info(f'Parsed requests data {requests_embeddings.shape}')
+    logging.info(f'Parsed requests data {requests_embeddings.shape}')
     training_embeddings = get_training_embeddings(model, servable, training_df)
-    logger.info(f'Parsed training data, result: {training_embeddings.shape}')
+    logging.info(f'Parsed training data, result: {training_embeddings.shape}')
 
     result, ml_transformer = visualize_high_dimensional(method, parameters,
                                                         training_embeddings, requests_embeddings,
@@ -124,7 +101,7 @@ def transform(method):
                                                         vis_metrics=vis_metrics)
 
     result.update(requests_data)
-    logger.info(f'Request handled in {datetime.now() - start}')
+    logging.info(f'Request handled in {datetime.now() - start}')
 
     # saving to S3
     if 'embedding' not in training_df.columns:
@@ -135,14 +112,14 @@ def transform(method):
     res = s3manager.write_json(data=result, bucket_name=bucket_name,
                                filename=result_path)
     if res:
-        db_record["result_file"] = result_path
+        db_model_info["result_file"] = result_path
 
     transformer_path = os.path.join(os.path.dirname(profile_file), f'{method}_transformer')
     res = s3manager.write_transformer(ml_transformer, bucket_name, transformer_path)
     if res:
-        db_record['transformer_file'] = transformer_path
+        db_model_info['transformer_file'] = transformer_path
 
-    save_record(db, method, db_record)
+    save_record(db, method, db_model_info)
     servable.delete()
     return jsonify(result)
 
@@ -153,7 +130,7 @@ def set_params(method):
     1. write new params to db
     :return: 200
     '''
-    logger.info("Received set params request")
+    logging.info("Received set params request")
     request_json = request.get_json()
     model_name = request_json['model_name']
     model_version = request_json['model_version']
@@ -193,13 +170,13 @@ def set_record(db, model_name, model_version, method, parameters, use_labels):
     if existing_record is not None:
         existing_parameters = existing_record.get("parameters", {})
         if parameters == existing_parameters:
-            logger.info("Transformer with same parameters already existed")
+            logging.info("Transformer with same parameters already existed")
             status = "existed"
             return status
         else:
             db[method].update_one({"model_name": model_name,
                                    "model_version": model_version}, {"$set": new_method_record})
-            logger.info("Transformer was modified")
+            logging.info("Transformer was modified")
             status = "modified"
             return status
 
@@ -208,4 +185,4 @@ def set_record(db, model_name, model_version, method, parameters, use_labels):
 
 
 if __name__ == "__main__":
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=DEBUG_ENV, host='0.0.0.0', port=5000)

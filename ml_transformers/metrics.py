@@ -1,15 +1,14 @@
+import numpy as np
+from msid.msid import msid_score
+from scipy.spatial import procrustes
+from sklearn import svm
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
-from sklearn.model_selection import train_test_split, GridSearchCV
-from sklearn import svm
-from sklearn.metrics import roc_auc_score
-from sklearn.neighbors import KNeighborsClassifier as KNN
-from scipy.spatial import procrustes
-from msid.msid import msid_score
-import numpy as np
-from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import adjusted_rand_score, adjusted_mutual_info_score
-import hdbscan
+from sklearn.metrics import roc_auc_score
+from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.neighbors import KNeighborsClassifier as KNN
+from sklearn.preprocessing import StandardScaler
 
 
 def global_score(X, Y):
@@ -82,7 +81,6 @@ def stability_score(X, method, sample_indeces=None, sample_size=0.1):
     :param transformer:
     :param sample_indeces:
     '''
-    import sklearn
     if sample_indeces is not None:
         msk = sample_indeces
     else:

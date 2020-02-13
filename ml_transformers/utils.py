@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import List
 
 import numpy as np
-from loguru import logger
+from loguru import logger as logging
 from scipy.spatial import cKDTree
 
 AVAILABLE_TRANSFORMERS = {'umap'}  # {'umap', 'tsne', 'trimap'}
@@ -29,5 +29,5 @@ def get_top_100(X) -> List[List[int]]:
         _, top = tree.query(X[i], k=101)
         top = np.delete(top, np.where(top == i))
         top_100.append(top.tolist())
-    logger.info(f'TOP 100 nighbour calculation took: {datetime.now() - start}')
+    logging.info(f'TOP 100 nighbour calculation took: {datetime.now() - start}')
     return top_100

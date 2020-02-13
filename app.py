@@ -1,4 +1,6 @@
+import json
 import os
+import sys
 from datetime import datetime
 
 from flask import Flask, request, jsonify
@@ -12,8 +14,9 @@ from data_management import get_record, get_training_embeddings, get_requests_da
 from ml_transformers.utils import DEFAULT_PARAMETERS
 from visualizer import visualize_high_dimensional
 
-app = Flask(__name__)
-CORS(app, expose_headers=['location'])
+with open("version.json") as version_file:
+    BUILDINFO = json.load(version_file)  # Load buildinfo with branchName, headCommitId and version label
+    BUILDINFO['pythonVersion'] = sys.version  # Augment with python runtime version
 
 DEBUG_ENV = bool(os.getenv("DEBUG_ENV", True))
 
@@ -40,10 +43,18 @@ mongo_client = get_mongo_client()
 db = mongo_client['visualization']
 s3manager = S3Manager()
 
+app = Flask(__name__)
+CORS(app, expose_headers=['location'])
+
 
 @app.route("/", methods=['GET'])
 def hello():
     return "Hi! I am Visualization service"
+
+
+@app.route("/buildinfo", methods=['GET'])
+def buildinfo():
+    return jsonify(BUILDINFO)
 
 
 @app.route('/plottable_embeddings/<method>', methods=['GET'])
@@ -78,9 +89,12 @@ def transform(method):
     results_bucket = db_model_info.get('embeddings_bucket_name', '')
     transfomer_path = db_model_info.get('transformer_file', '')
     result_path = db_model_info.get('result_file', '')
-    if result_path:
+    if result_path and results_bucket:
         result = s3manager.read_json(bucket_name=results_bucket, filename=result_path)
-        return result
+        if result:
+            servable.delete()
+            logging.info(f'Request handled in {datetime.now() - start}')
+            return result
     if transfomer_path and results_bucket:
         transformer_instance = s3manager.read_transformer(bucket_name=results_bucket, filename=transfomer_path)
     else:
@@ -90,6 +104,7 @@ def transform(method):
     requests_df = s3manager.read_parquet(bucket_name=bucket_name, filename=requests_file)
     requests_data, requests_embeddings = get_requests_data(requests_df, model.monitoring_models())
     if requests_embeddings is None:
+        servable.delete()
         return jsonify({"message": f"Unable to get requests embeddings from {requests_file}"}), 404
     logging.info(f'Parsed requests data {requests_embeddings.shape}')
     training_embeddings = get_training_embeddings(model, servable, training_df)
@@ -108,6 +123,9 @@ def transform(method):
         training_df['embedding'] = training_embeddings.tolist()
         s3manager.write_parquet(training_df, bucket_name, profile_file)
 
+    if not results_bucket:
+        results_bucket = bucket_name
+        db_model_info['embeddings_bucket_name'] = results_bucket
     result_path = os.path.join(os.path.dirname(profile_file), f'transformed_{method}.json')
     res = s3manager.write_json(data=result, bucket_name=bucket_name,
                                filename=result_path)

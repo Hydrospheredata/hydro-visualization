@@ -62,6 +62,8 @@ class S3Manager:
         return True
 
     def read_json(self, bucket_name: str, filename: str) -> Dict:
+        if not self.file_exists(bucket_name, filename):
+            return {}
         try:
             response = self.s3.get_object(Bucket=bucket_name, Key=filename)
         except Exception as e:

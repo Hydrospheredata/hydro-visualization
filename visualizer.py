@@ -49,7 +49,7 @@ def visualize_high_dimensional(method, parameters, training_embeddings, requests
     logger.info(
         f'Fitting {total_embeddings.shape[0]} {total_embeddings.shape[1]}-dimensional points took {datetime.now() - start}')
 
-    vis_eval_metrics = ml_transformer.eval(total_embeddings, transformed_embeddings, y=None,
+    vis_eval_metrics = ml_transformer.eval(total_embeddings[:len(transformed_embeddings)], transformed_embeddings, y=None,
                                            evaluation_metrics=vis_metrics)  # TODO add ground truth_labels
     top_100_neighbours = get_top_100(requests_embeddings)
     transformed_embeddings = transformed_embeddings[:len(requests_embeddings)]

@@ -262,7 +262,7 @@ def get_training_embeddings(model: HydroServingModel, servable: HydroServingServ
     :param training_data: Dataframe with data
     :return: np.ndarray with embeddings or None if failed
     '''
-    if 'embedding' in training_data.columns:
+    if 'embedding__' in training_data.columns:
         logging.info('Training embeddings exist')
         embs = np.stack(training_data['embedding'].values)
         return embs

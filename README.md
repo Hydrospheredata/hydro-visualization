@@ -108,35 +108,28 @@ GET /plottable_embeddings/transformer
 
 ### Database schema 
 
-collection: visualization
 documents: key - model_name: model_version
 collection: umap, trimap, tsne
+
+- add created field
+
 ```json
 {
 "model_name": "adult_scalar",
 "model_version": "1",
 "date_trained": "datetime",
 "embeddings_bucket_name": "hydro-vis",
-"transformed_embeddings": { "requests_files":  ["PACS/data/transformed/requests.csv"]},
+"result_file": "result.json",
+"transformer_file": "umap_transformer",
 "parameters": {"n_neighbours": 15,
                   "min_dist": 0.1,
                   "metric":  "cosine"},
-"use_labels": false,
-"model": {"created": "",
-          "object":  ""} 
+"use_labels": false
 }
 ```
 transformed_embeddings - files that store transformed embeddings with labels and other monitoring numbers
 
 transformer structure
-```json
-{"name":  "umap",
-"date_created": "datetime",
-"transformed_embeddings": {"bucket_name": "hydro-vis",
-                            "requests_files":  ["PACS/data/transformed/requests.csv"]},
-"object": ""
-}
-```
 
 
 transformed embeddings file format:

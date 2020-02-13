@@ -1,10 +1,13 @@
+import json
 import os
 import pickle
+import tempfile
 from datetime import datetime
 from io import StringIO
-from typing import Dict
+from typing import Dict, Optional
 
 import boto3
+import joblib
 import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq
@@ -14,6 +17,8 @@ from loguru import logger
 from tqdm import tqdm
 
 from client import HydroServingModel, HydroServingServable
+from ml_transformers.transformer import Transformer
+from ml_transformers.utils import DEFAULT_PARAMETERS
 
 
 class S3Manager:
@@ -42,6 +47,71 @@ class S3Manager:
             return file_type, df
         return '', None
 
+    def write_parquet(self, df: pd.DataFrame, bucket_name, filename):
+        try:
+            df.to_parquet(f's3://{bucket_name}/{filename}')
+        except Exception as e:
+            logger.error(f'Couldn\'t write {filename} to {bucket_name} bucket. Error: {e}')
+
+    def write_json(self, data: Dict, bucket_name: str, filename: str) -> bool:
+        try:
+            self.s3.put_object(Bucket=bucket_name, Body=json.dumps(data), Key=filename)
+        except Exception as e:
+            logger.error(f'Couldn\'t write json to {bucket_name} bucket. Error: {e}')
+            return False
+        return True
+
+    def read_json(self, bucket_name: str, filename: str) -> Dict:
+        try:
+            response = self.s3.get_object(Bucket=bucket_name, Key=filename)
+        except Exception as e:
+            logger.error(f'Couldn\'t request {bucket_name} bucket. Error: {e}')
+            return {}
+        object_body = response['Body']
+        try:
+            content = json.loads(object_body.read())
+        except Exception as e:
+            logger.error(f'Couldn\'t read {bucket_name}:{filename} file as json file. Error: {e}')
+            return {}
+        return content
+
+    def file_exists(self, bucket_name: str, filename):
+        try:
+            response = self.s3.list_objects(Bucket=bucket_name)
+        except Exception as e:
+            logger.error(f'Couldn\'t request {bucket_name} bucket. Error: {e}')
+            return False
+        files = list(map(lambda x: x.get('Key', ''), response.get('Contents', [{}])))
+        if filename in files:
+            return True
+        return False
+
+    def write_transformer(self, transformer, bucket_name, filename):
+        try:
+            with tempfile.TemporaryFile() as fp:
+                joblib.dump(transformer, fp)
+                fp.seek(0)
+                self.s3.put_object(Body=fp.read(), Bucket=bucket_name, Key=filename)
+        except Exception as e:
+            logger.error(f'Couldn\'t write transformer to {bucket_name}/{filename} bucket. Error: {e}')
+            return False
+        return True
+
+    def read_transformer(self, bucket_name, filename) -> Optional[Transformer]:
+        '''
+        Loads pretrained transformer model from S3
+        :param bucket_name:
+        :param filename:
+        :return: transofrmer or None (if file doesn't exist)
+        '''
+        if not self.file_exists(bucket_name, filename):
+            logger.error('Transformer doesn\'t exists')
+            return None
+        with tempfile.TemporaryFile() as fp:
+            self.s3.download_fileobj(Fileobj=fp, Bucket=bucket_name, Key=filename)
+            fp.seek(0)
+            transformer = joblib.load(fp)
+            return transformer
 
 
 def parse_requests_dataframe(df, monitoring_fields) -> (Dict, np.ndarray):
@@ -80,12 +150,13 @@ def parse_requests_dataframe(df, monitoring_fields) -> (Dict, np.ndarray):
     for (monitoring_name, comp_operator) in monitoring_fields:
         scores = np.array(df[monitoring_name])
         thresholds = np.array(df[f'{monitoring_name}_threshold'])
-        monitoring[monitoring_name] = {'scores': scores.tolist(), 'threshold': thresholds[0], 'operation': comp_operator}  # taking last threshold
+        monitoring[monitoring_name] = {'scores': scores.tolist(), 'threshold': thresholds[0],
+                                       'operation': comp_operator}  # taking last threshold
     class_info = {'class': predictions, 'confidence': confidence}
     return {'class_labels': class_info, 'metrics': monitoring, 'requests_ids': requests_ids}, embeddings
 
 
-def get_requests_data(requests_df, monitoring_fields) -> Dict:
+def get_requests_data(requests_df: pd.DataFrame, monitoring_fields) -> Dict:
     '''
 
     :param bucket_name:
@@ -116,11 +187,38 @@ def get_record(db, method, model_name, model_version):
     existing_record = db[method].find_one({"model_name": model_name,
                                            "model_version": model_version})
     if existing_record is None:
-        return {}
+        return {"model_name": model_name,
+                "model_version": model_version,
+                "embeddings_bucket_name": "",
+                "result_file": "",
+                "transformer_file": "",
+                "parameters": DEFAULT_PARAMETERS[method],
+                "use_labels": False}
     return existing_record
 
 
-def save_instance(db, method, model_name, model_version, instance)->bool:
+def save_record(db, method: str, record: Dict):
+    '''
+    Saves information about transformer to database or updates information if it existed
+    :param db:
+    :param method: 'umap' (method name from ml_transformers.utils.AVAILABLE_TRANSFORMERS)
+    :param record: Dict with values
+    :return:
+    '''
+    model_name = record['model_name']
+    model_version = record['model_version']
+    existing_record = db[method].find_one({"model_name": model_name,
+                                           "model_version": model_version})
+    if existing_record:
+        logger.info('Record existed!')
+        db[method].update_one({"model_name": model_name,
+                               "model_version": model_version}, {"$set": record})
+    else:
+        logger.info('Saving new record')
+        db[method].insert_one(record)
+
+
+def save_instance(db, method, model_name, model_version, instance) -> bool:
     existing_record = db[method].find_one({"model_name": model_name,
                                            "model_version": model_version})
     if existing_record is None:
@@ -133,6 +231,7 @@ def save_instance(db, method, model_name, model_version, instance)->bool:
                            "model_version": model_version}, {"$set": existing_record})
     logger.info(f'saved serialized model')
     return True
+
 
 def serialize(obj):
     '''
@@ -161,6 +260,10 @@ def get_training_embeddings(model: HydroServingModel, servable: HydroServingServ
     :param training_data: Dataframe with data
     :return: np.ndarray with embeddings or None if failed
     '''
+    if 'embedding' in training_data.columns:
+        logger.info('Training embeddings exist')
+        embs = np.stack(training_data['embedding'].values)
+        return embs
     output_names = list(map(lambda x: x['name'], model.contract.contract_dict['outputs']))
     input_names = list(map(lambda x: x['name'], model.contract.contract_dict['inputs']))
     if 'embedding' not in output_names:

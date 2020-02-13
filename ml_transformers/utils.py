@@ -11,7 +11,9 @@ UMAP_N_NEIGHBOURS = 15
 UMAP_MIN_DIST = 0.1
 UMAP_METRIC = 'euclidean'
 
-DEFAULT_UMAP_PARAMETERS = {'min_dist': 0.1, 'n_neighbours': 15, 'metric': 'euclidean', 'n_components': 2}
+DEFAULT_PARAMETERS = {'umap':
+                          {'min_dist': 0.1, 'n_neighbours': 15, 'metric': 'euclidean', 'n_components': 2}
+                      }
 
 
 def get_top_100(X) -> List[List[int]]:

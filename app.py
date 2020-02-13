@@ -7,8 +7,9 @@ from loguru import logger
 from pymongo import MongoClient
 
 from client import HydroServingClient
-from data_management import S3Manager
-from data_management import get_record, deserialize, get_training_embeddings, get_requests_data
+from data_management import S3Manager, save_record
+from data_management import get_record, get_training_embeddings, get_requests_data
+from ml_transformers.utils import DEFAULT_PARAMETERS
 from visualizer import visualize_high_dimensional
 
 app = Flask(__name__)
@@ -80,11 +81,11 @@ def transform(method):
     start = datetime.now()
     request_json = request.get_json()
     logger.info(f'Received request: {request_json}')
-    model_name = request_json['model_name']
-    model_version = request_json['model_version']
-    bucket_name = request_json.get('data', {})['bucket']
-    requests_file = request_json.get('data', {})['requests_file']
-    profile_file = request_json.get('data', {})['profile_file']
+    model_name = request_json.get('model_name', '')
+    model_version = request_json.get('model_version', '')
+    bucket_name = request_json.get('data', {}).get('bucket', '')
+    requests_file = request_json.get('data', {}).get('requests_file', '')
+    profile_file = request_json.get('data', {}).get('profile_file', '')
     vis_metrics = request_json.get('visualization_metrics', {})
 
     try:
@@ -93,22 +94,28 @@ def transform(method):
     except ValueError as e:
         return jsonify({"message": f"Unable to found {model_name}v{model_version}. Error: {e}"}), 404
     except Exception as e:
-        return  jsonify({"message": f"Error creating model {model_name}v{model_version}. Error: {e}"}), 500
+        return jsonify({"message": f"Error creating model {model_name}v{model_version}. Error: {e}"}), 500
 
     db_record = get_record(db, method, model_name, str(model_version))
     parameters = db_record.get('parameters', {})
-    model_record = db_record.get('model', {})
-    transformer_instance = None
-    if model_record:
-        transformer_instance = deserialize(model_record['object'])
-        logger.info('Model instance deserialized')
+    results_bucket = db_record.get('embeddings_bucket_name', '')
+    transfomer_path = db_record.get('transformer_file', '')
+    result_path = db_record.get('result_file', '')
+    if result_path:
+        result = s3manager.read_json(bucket_name=results_bucket, filename=result_path)
+        return result
+    if transfomer_path and results_bucket:
+        transformer_instance = s3manager.read_transformer(bucket_name=results_bucket, filename=transfomer_path)
+    else:
+        transformer_instance = None
 
     training_df = s3manager.read_parquet(bucket_name=bucket_name, filename=profile_file)
     requests_df = s3manager.read_parquet(bucket_name=bucket_name, filename=requests_file)
     requests_data, requests_embeddings = get_requests_data(requests_df, model.monitoring_models())
+    if requests_embeddings is None:
+        return jsonify({"message": f"Unable to get requests embeddings from {requests_file}"}), 404
     logger.info(f'Parsed requests data {requests_embeddings.shape}')
     training_embeddings = get_training_embeddings(model, servable, training_df)
-
     logger.info(f'Parsed training data, result: {training_embeddings.shape}')
 
     result, ml_transformer = visualize_high_dimensional(method, parameters,
@@ -118,8 +125,24 @@ def transform(method):
 
     result.update(requests_data)
     logger.info(f'Request handled in {datetime.now() - start}')
-    # success = save_instance(db, method, model_name, str(model_version), ml_transformer)
-    # logger.info(f'Saving instance status: success:{success}')
+
+    # saving to S3
+    if 'embedding' not in training_df.columns:
+        training_df['embedding'] = training_embeddings.tolist()
+        s3manager.write_parquet(training_df, bucket_name, profile_file)
+
+    result_path = os.path.join(os.path.dirname(profile_file), f'transformed_{method}.json')
+    res = s3manager.write_json(data=result, bucket_name=bucket_name,
+                               filename=result_path)
+    if res:
+        db_record["result_file"] = result_path
+
+    transformer_path = os.path.join(os.path.dirname(profile_file), f'{method}_transformer')
+    res = s3manager.write_transformer(ml_transformer, bucket_name, transformer_path)
+    if res:
+        db_record['transformer_file'] = transformer_path
+
+    save_record(db, method, db_record)
     servable.delete()
     return jsonify(result)
 
@@ -156,12 +179,16 @@ def set_record(db, model_name, model_version, method, parameters, use_labels):
     new_method_record = {"model_name": model_name,
                          "model_version": model_version,
                          "embeddings_bucket_name": "",
-                         "transformed_files": {},
+                         "result_file": "",
+                         "transformer_file": "",
                          "parameters": parameters,
-                         "use_labels": use_labels,
-                         "model": {}}
+                         "use_labels": use_labels}
+
     existing_record = db[method].find_one({"model_name": model_name,
                                            "model_version": model_version})
+
+    if not parameters:
+        parameters = DEFAULT_PARAMETERS[method]
 
     if existing_record is not None:
         existing_parameters = existing_record.get("parameters", {})
@@ -177,7 +204,7 @@ def set_record(db, model_name, model_version, method, parameters, use_labels):
             return status
 
     db[method].insert_one(new_method_record)
-    return status
+    return status,
 
 
 if __name__ == "__main__":

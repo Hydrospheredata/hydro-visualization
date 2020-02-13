@@ -7,7 +7,7 @@ from umap import UMAP
 
 from .metrics import global_score, sammon_error, stability_score, auc_score, intristic_multiscale_score, \
     clustering_score
-from .utils import DEFAULT_UMAP_PARAMETERS
+from .utils import DEFAULT_PARAMETERS
 
 
 class Transformer(ABC):
@@ -72,15 +72,15 @@ class Transformer(ABC):
 
 class UmapTransformer(Transformer):
     def __init__(self, parameters):
-        self.default_parameters = DEFAULT_UMAP_PARAMETERS
+        self.default_parameters = DEFAULT_PARAMETERS['umap']
         super().__init__(parameters)
         self.embedding_ = None
 
     def __set_params__(self, parameters):
-        self.min_dist = parameters.get('min_dist', DEFAULT_UMAP_PARAMETERS['min_dist'])
-        self.n_neighbours = parameters.get('n_neighbours', DEFAULT_UMAP_PARAMETERS['n_neighbours'])
-        self.metric = parameters.get('metric', DEFAULT_UMAP_PARAMETERS['metric'])
-        self.n_components = parameters.get('n_components', DEFAULT_UMAP_PARAMETERS['n_components'])
+        self.min_dist = parameters.get('min_dist', self.default_parameters['min_dist'])
+        self.n_neighbours = parameters.get('n_neighbours', self.default_parameters['n_neighbours'])
+        self.metric = parameters.get('metric', self.default_parameters['metric'])
+        self.n_components = parameters.get('n_components', self.default_parameters['n_components'])
         self.use_labels = parameters.get('use_labels', False)
 
     def __create__(self):

@@ -1,8 +1,6 @@
 import json
 import os
-import pickle
 import tempfile
-from datetime import datetime
 from io import StringIO
 from typing import Dict, Optional
 
@@ -12,7 +10,6 @@ import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq
 import s3fs
-from bson.binary import Binary
 from loguru import logger as logging
 from tqdm import tqdm
 
@@ -28,7 +25,6 @@ class S3Manager:
         if self.access_key == '' or self.secret_key == '':
             logging.info('Access keys for S3 were not found')
         self.s3 = boto3.client('s3', aws_access_key_id=self.access_key, aws_secret_access_key=self.secret_key)
-        self.s3 = boto3.client('s3')
         self.fs = s3fs.S3FileSystem()
 
     def read_parquet(self, bucket_name, filename):
@@ -174,17 +170,6 @@ def get_requests_data(requests_df: pd.DataFrame, monitoring_fields) -> Dict:
     return parse_requests_dataframe(requests_df, monitoring_fields)
 
 
-def get_pretrained_files(db, method, model_name, model_version):
-    existing_record = db[method].find_one({"model_name": model_name,
-                                           "model_version": model_version})
-
-    if existing_record is not None:
-        model_record = existing_record.get('model', {})
-        model_object = deserialize(model_record['object'])
-        return model_object
-    return None
-
-
 def get_record(db, method, model_name, model_version):
     existing_record = db[method].find_one({"model_name": model_name,
                                            "model_version": model_version})
@@ -218,39 +203,6 @@ def save_record(db, method: str, record: Dict):
     else:
         logging.info('Saving new record')
         db[method].insert_one(record)
-
-
-def save_instance(db, method, model_name, model_version, instance) -> bool:
-    existing_record = db[method].find_one({"model_name": model_name,
-                                           "model_version": model_version})
-    if existing_record is None:
-        return False
-    model_record = existing_record.get('model', {})
-    model_record['created'] = datetime.now()
-    model_record['object'] = serialize(instance)
-    existing_record['model'] = model_record
-    db[method].update_one({"model_name": model_name,
-                           "model_version": model_version}, {"$set": existing_record})
-    logging.info(f'saved serialized model')
-    return True
-
-
-def serialize(obj):
-    '''
-    Serializes object to write it to database
-    :param obj: custom object
-    :return: bytes string
-    '''
-    return Binary(pickle.dumps(obj))
-
-
-def deserialize(bytes_str):
-    '''
-    Deserializes object written to db to obj
-    :param bytes_str:
-    :return: object
-    '''
-    return pickle.loads(bytes_str)
 
 
 def get_training_embeddings(model: HydroServingModel, servable: HydroServingServable,

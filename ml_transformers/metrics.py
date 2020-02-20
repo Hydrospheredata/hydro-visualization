@@ -1,3 +1,5 @@
+from typing import Dict
+
 import numpy as np
 from msid.msid import msid_score
 from scipy.spatial import procrustes
@@ -11,7 +13,7 @@ from sklearn.neighbors import KNeighborsClassifier as KNN
 from sklearn.preprocessing import StandardScaler
 
 
-def global_score(X, Y):
+def global_score(X: np.ndarray, Y: np.ndarray) -> np.float:
     """
     Global score
     Source: https://github.com/eamid/trimap
@@ -21,11 +23,11 @@ def global_score(X, Y):
     Y: Embedding
     """
 
-    def global_loss_(X, Y):
-        X = X - np.mean(X, axis=0)
-        Y = Y - np.mean(Y, axis=0)
-        A = X.T @ (Y @ np.linalg.inv(Y.T @ Y))
-        return np.mean(np.power(X.T - A @ Y.T, 2))
+    def global_loss_(x, y):
+        x = x - np.mean(X, axis=0)
+        y = y - np.mean(Y, axis=0)
+        A = x.T @ (y @ np.linalg.inv(y.T @ y))
+        return np.mean(np.power(x.T - A @ y.T, 2))
 
     n_dims = Y.shape[1]
     Y_pca = PCA(n_components=n_dims).fit_transform(X)
@@ -34,11 +36,14 @@ def global_score(X, Y):
     return np.exp(-(gs_emb - gs_pca) / gs_pca)
 
 
-def auc_score(X, y, cv=5, splits=None):
-    '''
+def auc_score(X: np.ndarray, y: np.ndarray, cv=5, splits=None) -> Dict[str, np.float]:
+    """
     return svc score, knn score
+    :param X: points in projected space
+    :param y: labels of X
+    :param cv: number of cross validation splits
     :param splits: [(train, test)] splits from k fold splits
-    '''
+    """
     result = {}
     n_classes = len(set(y))
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.33, random_state=42)
@@ -73,39 +78,39 @@ def auc_score(X, y, cv=5, splits=None):
     return result
 
 
-def stability_score(X, method, sample_indeces=None, sample_size=0.1):
-    '''
+def stability_score(X: np.ndarray, transformer, sample_indices=None, sample_size=0.1):
+    """
     Measures stabilty of embedding by subsampling from data, fitting sample and full data and measuring Procrustes distance
     between two potentially comparable distributions. From https://arxiv.org/abs/1802.03426
-    :param  X:
-    :param transformer:
-    :param sample_indeces:
-    '''
-    if sample_indeces is not None:
-        msk = sample_indeces
+    :param  X: points in original space
+    :param transformer: transformer instance
+    :param sample_indices: sample points indices
+    :param sample_size: size of sample (only if not sample indices provided)
+    """
+    if sample_indices is not None:
+        msk = sample_indices
     else:
         msk = np.random.rand(len(X)) < sample_size
     sample = X[msk]
-    embs = method.fit_transform(X)
-    sample_embs = method.fit_transform(sample)
+    embs = transformer.fit_transform(X)
+    sample_embs = transformer.fit_transform(sample)
     mtx1, mtx2, disparity = procrustes(embs[msk], sample_embs)
     avg_d = np.mean(np.linalg.norm(mtx1 - mtx2, axis=1))
     return avg_d
 
 
-def sammon_error(X, _X, distance_metric=lambda x1, x2: np.linalg.norm(x1 - x2)):
-    '''
+def sammon_error(X: np.ndarray, _X: np.ndarray, distance_metric=lambda x1, x2: np.linalg.norm(x1 - x2)):
+    """
     computes sammon's error for original points in original space and points in reduced space
     X in Rn
     _X in Rm - reduced space
     X: points in original space
     _X: points in projecteed space
     distance_metric: Callable - f(x1, x2)-> float
-
-    '''
+    """
     if len(X) != len(_X):
-        raise Exception(f'Original and projection sets have different sizes: len(X)={len(X)} len(_X)={len(_X)}')
-    assert len(X) == len(_X)
+        raise Exception(
+            f'Original and projection sets have different sizes: len(X)={len(X)} len(_X)={len(_X)}')  # TODO handling
     orig_distances = np.array([distance_metric(X[i], X[i + 1]) for i in range(len(X) - 1)])
     proj_distances = np.array([distance_metric(_X[i], _X[i + 1]) for i in range(len(_X) - 1)])
     orig_distances += 1.e-13
@@ -114,26 +119,25 @@ def sammon_error(X, _X, distance_metric=lambda x1, x2: np.linalg.norm(x1 - x2)):
     return error
 
 
-def intristic_multiscale_score(X, _X):
-    '''
+def intristic_multiscale_score(X: np.ndarray, _X: np.ndarray) -> float:
+    """
     Computes MSID score (https://arxiv.org/abs/1905.11141) for embeddings
-    :param X:
-    :param _X:
+    :param X: points in original space
+    :param _X: points in projected space
     :return:
-    '''
+    """
     return msid_score(X, _X)
 
 
-def clustering_score(_X, y):
-    '''
+def clustering_score(_X: np.ndarray, y: np.ndarray) -> (float, float):
+    """
     Computes 2 scores between clustering labeling and true labels:
         - adjusted_rand_score
         - mutual_info_score
-    :param X:
-    :param _X:
+    :param _X: points in projected space
     :param y:
     :return: adjusted_rand_score, mutual_info_score
-    '''
+    """
     n_clusters = len(np.unique(y))
     kmeans = KMeans(n_clusters=n_clusters).fit(_X)
     labels = kmeans.labels_

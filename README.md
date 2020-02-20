@@ -24,7 +24,7 @@ MONGO_PASS = os.getenv("MONGO_PASS")
 
 ## API
 
-1.**GET** /plottable_embeddings/transformer
+1.**POST** /plottable_embeddings/<transformer>
 
     transformer - manifold learning transformer from ["umap", "trimap", "tsne"]. For now only ["umap"].
   
@@ -33,7 +33,7 @@ MONGO_PASS = os.getenv("MONGO_PASS")
 {        "model_name": "adult_scalar",
          "model_version": 1,
          "data": { "bucket": "hydro-vis",
-                   "requests_files": "adult/requests.parquet",
+                   "requests_file": "adult/requests.parquet",
                    "profile_file": "adult/training.parquet"
                    },
          "visualization_metrics": ["global_score", "sammon_error", "auc_score", "stability_score", "msid", "clustering"]
@@ -69,7 +69,7 @@ MONGO_PASS = os.getenv("MONGO_PASS")
 ```
 
   
-2. **POST** /set_params
+2. **POST** /params/<method>
   
     **request format**:
     ```json
@@ -98,13 +98,13 @@ MONGO_PASS = os.getenv("MONGO_PASS")
 2. upload demo/adult/model and demo/adult/monitoring_model
 2. send request 
 
-GET /plottable_embeddings/transformer 
+POST /plottable_embeddings/umap
 
 ```json
 {        "model_name": "adult_scalar",
          "model_version": 1,
          "data": { "bucket": "hydro-vis",
-                   "requests_files": "adult/requests.parquet",
+                   "requests_file": "adult/requests.parquet",
                    "profile_file": "adult/training.parquet"
                    },
          "visualization_metrics": ["global_score", "sammon_error", "auc_score", "stability_score", "msid", "clustering"]
@@ -162,3 +162,5 @@ Total request handling: 12-17s
 4. Send embeddings, labels, confidence, top_100 neighbours
 
 
+
+TODO add time management

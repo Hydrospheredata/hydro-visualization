@@ -41,7 +41,7 @@ class Transformer(ABC):
              evaluation_metrics=["global_score", "sammon_error",
                                  "auc_score", "stability_score", "msid", "clustering"],
              _auc_cv=5) -> Dict[str, str]:
-        '''
+        """
         Evaluates vizualization using listed evaluation_metrics names
         :param X: original points
         :param _X: transformed points
@@ -49,12 +49,13 @@ class Transformer(ABC):
         :param evaluation_metrics: list of metrics names
         :param _auc_cv: number of splits for acc evaluation
         :return: dict of metric values
-        '''
+        """
         start = datetime.now()
         eval_metrics = {}
         if 'global_score' in evaluation_metrics:
             eval_metrics['global_score'] = str(global_score(X, _X))
         if 'sammon_error' in evaluation_metrics:
+
             eval_metrics['sammon_error'] = str(sammon_error(X, _X))
         if 'auc_score' in evaluation_metrics and y is not None:
             acc_result = auc_score(_X, y)

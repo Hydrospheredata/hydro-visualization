@@ -17,11 +17,11 @@ DEFAULT_PARAMETERS = {'umap':
 
 
 def get_top_100(X) -> List[List[int]]:
-    '''
+    """
     Finds top 100 closest neighbours for each point
     :param X: list of points in high dimensional space
     :return: 2D list of 100 neighbours indices for each point
-    '''
+    """
     start = datetime.now()
     tree = cKDTree(X)
     top_100 = []
@@ -29,5 +29,5 @@ def get_top_100(X) -> List[List[int]]:
         _, top = tree.query(X[i], k=101)
         top = np.delete(top, np.where(top == i))
         top_100.append(top.tolist())
-    logging.info(f'TOP 100 nighbour calculation took: {datetime.now() - start}')
+    logging.info(f'TOP 100 neighbour calculation took: {datetime.now() - start}')
     return top_100

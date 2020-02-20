@@ -7,17 +7,18 @@ from ml_transformers.transformer import UmapTransformer
 from ml_transformers.utils import get_top_100
 
 
-def visualize_high_dimensional(method, parameters, training_embeddings, requests_embeddings, transformer_instance=None,
+def transform_high_dimensional(method, parameters, training_embeddings, requests_embeddings, transformer_instance=None,
                                vis_metrics=["global_score", "sammon_error", "auc_score", "stability_score", "msid",
                                             "clustering"]):
     """
-    Visualizes high dimensional data
-    :param model_name: name of a model
-    :param model_version: version
-    :param method: 'umap'
-    :param request_files: list of S3 files with requests
-    :param profile_file: list of S3 files of data profile
-    :return: json with points if requests_embeddings are present, {}, None otherwise
+    Transforms data from higher dimensions to lower
+    :param method: transformer method
+    :param parameters: {}
+    :param training_embeddings:
+    :param requests_embeddings:
+    :param transformer_instance:
+    :param vis_metrics:
+    :return:
     """
     result = {}
     ml_transformer = None
@@ -47,9 +48,11 @@ def visualize_high_dimensional(method, parameters, training_embeddings, requests
             total_embeddings)  # TODO add ground truth labels management for semi-supervised umap
 
     logger.info(
-        f'Fitting {total_embeddings.shape[0]} {total_embeddings.shape[1]}-dimensional points took {datetime.now() - start}')
+        f'Fitting {total_embeddings.shape[0]} {total_embeddings.shape[1]}-dimensional points took '
+        f'{datetime.now() - start}')
 
-    vis_eval_metrics = ml_transformer.eval(total_embeddings[:len(transformed_embeddings)], transformed_embeddings, y=None,
+    vis_eval_metrics = ml_transformer.eval(total_embeddings[:len(transformed_embeddings)], transformed_embeddings,
+                                           y=None,
                                            evaluation_metrics=vis_metrics)  # TODO add ground truth_labels
     top_100_neighbours = get_top_100(requests_embeddings)
     transformed_embeddings = transformed_embeddings[:len(requests_embeddings)]
@@ -59,4 +62,3 @@ def visualize_high_dimensional(method, parameters, training_embeddings, requests
     result['visualization_metrics'] = vis_eval_metrics
     ml_transformer.embedding_ = None
     return result, ml_transformer
-

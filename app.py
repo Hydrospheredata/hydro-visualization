@@ -120,7 +120,7 @@ def transform(method: str):
     requests_data_dict = parse_requests_dataframe(production_requests_df, model.monitoring_models())
     logging.info(f'Parsed requests data shape: {production_embeddings.shape}')
 
-    if not training_df:
+    if training_df is not None:
         training_embeddings = None
     elif 'embedding' in training_df.columns:
         logging.debug('Training embeddings exist')
@@ -143,7 +143,7 @@ def transform(method: str):
     plottable_data.update(requests_data_dict)
     logging.info(f'Request handled in {datetime.now() - start}')
 
-    if training_df and 'embedding' not in training_df.columns:
+    if training_df is not None and 'embedding' not in training_df.columns:
         training_df['embedding'] = training_embeddings.tolist()
         s3manager.write_parquet(training_df, bucket_name, path_to_training_data)
 
@@ -198,9 +198,11 @@ def valid_model(model: HydroServingModel) -> [bool]:
     :param model:
     :return:
     """
+
     output_names = list(map(lambda x: x['name'], model.contract.contract_dict['outputs']))
     if 'embedding' not in output_names:
         return False
+    return True
 
 
 if __name__ == "__main__":

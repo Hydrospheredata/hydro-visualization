@@ -30,12 +30,12 @@ class S3Manager:
 
     def write_parquet(self, df: pd.DataFrame, bucket_name, filename):
         try:
-                df.to_parquet(f's3://{bucket_name}/{filename}')
+            df.to_parquet(f's3://{bucket_name}/{filename}')
         except Exception as e:
             logging.error(f'Couldn\'t write {filename} to {bucket_name} bucket. Error: {e}')
 
     def write_json(self, data: Dict, bucket_name: str, filename: str):
-        with self.fs.open(f's3://{bucket_name}/{filename}', 'w+') as f:
+        with self.fs.open(f's3://{bucket_name}/{filename}', 'w') as f:
             f.write(json.dumps(data))
 
 
@@ -67,7 +67,7 @@ class S3Manager:
         :param filename:
         :return:
         """
-        with self.fs.open(f'{bucket_name}/{filename}', 'w+') as f:
+        with self.fs.open(f'{bucket_name}/{filename}', 'w') as f:
             try:
                 joblib.dump(transformer, f)
             except Exception as e:
@@ -115,12 +115,12 @@ def parse_requests_dataframe(df, monitoring_fields: List[Tuple[str, str]]) -> Di
         coloring_info = {}
         if np.issubdtype(column, np.integer):
             coloring = Coloring.CLASS
-            coloring_info['classes'] = np.unique(df['class'])
+            coloring_info['classes'] = np.unique(df['class']).tolist()
         elif np.issubdtype(column, np.floating):
             coloring = Coloring.GRADIENT
         else:
             coloring = Coloring.NONE
-        coloring_info['coloring_type'] = coloring
+        coloring_info['coloring_type'] = coloring.value
         return coloring_info
 
     requests_ids = df['request_id'].values.tolist()

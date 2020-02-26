@@ -48,14 +48,18 @@ MONGO_PASS = os.getenv("MONGO_PASS")
  "data": [[0.1, 0.2], [0.3, 0.4]],
 "request_ids": [200,2001],
  "class_labels": {
-                 "confidences": [0.1, 0.2, 0.3],
-                 "predicted": [1, 2, 1, 2]
+                 "confidence": {"data": [0.1, 0.2, 0.3],
+                                 "coloring_type":  "gradient"},
+                 "class": {"data": [1, 2, 1, 3, 1],
+                           "coloring_type":  "class",
+                           "classes":  [1, 2, 3]}
                    },
  "metrics": {
              "anomality": {
                            "scores": [0.1, 0.2, 0.5, 0.2],
                            "threshold": 0.5,
-                           "operation": ""
+                           "operation": "Eq",
+                           "coloring_type": "gradient"
                            }
              },
  "top_100": [[2, 3, 4], []],  

@@ -38,8 +38,8 @@ class Transformer(ABC):
         return None
 
     def eval(self, X: np.ndarray, _X: np.ndarray, y=None,
-             evaluation_metrics=["global_score", "sammon_error",
-                                 "auc_score", "stability_score", "msid", "clustering"],
+             evaluation_metrics=("global_score", "sammon_error",
+                                 "auc_score", "stability_score", "msid", "clustering"),
              _auc_cv=5) -> Dict[str, str]:
         """
         Evaluates vizualization using listed evaluation_metrics names

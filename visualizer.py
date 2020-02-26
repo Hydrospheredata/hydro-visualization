@@ -1,13 +1,17 @@
 from datetime import datetime
+from typing import Optional
 
 import numpy as np
 from loguru import logger
 
-from ml_transformers.transformer import UmapTransformer
-from ml_transformers.utils import get_top_100
+from ml_transformers.transformer import UmapTransformer, Transformer
+from ml_transformers.utils import get_top_100_neighbours
 
 
-def transform_high_dimensional(method, parameters, training_embeddings, requests_embeddings, transformer_instance=None,
+def transform_high_dimensional(method, parameters,
+                               training_embeddings: Optional[np.ndarray],
+                               production_embeddings: np.ndarray,
+                               transformer_instance: Optional[Transformer] = None,
                                vis_metrics=["global_score", "sammon_error", "auc_score", "stability_score", "msid",
                                             "clustering"]):
     """
@@ -15,50 +19,52 @@ def transform_high_dimensional(method, parameters, training_embeddings, requests
     :param method: transformer method
     :param parameters: {}
     :param training_embeddings:
-    :param requests_embeddings:
+    :param production_embeddings:
     :param transformer_instance:
     :param vis_metrics:
-    :return:
+    :return: (embedding dict, transformer)
     """
     result = {}
-    ml_transformer = None
+    transformer = None
     need_fit = True
 
     if method == 'umap':
         if transformer_instance and isinstance(transformer_instance, UmapTransformer):
             need_fit = False
-            ml_transformer = transformer_instance
+            transformer = transformer_instance
         else:
-            ml_transformer = UmapTransformer(parameters)
-    if ml_transformer is None:
+            transformer = UmapTransformer(parameters)
+    if transformer is None:
         logger.error('Cannot define transformer. Illegal method name')
 
-    if training_embeddings is not None and requests_embeddings is not None:
-        total_embeddings = np.concatenate([requests_embeddings, training_embeddings])
-    elif requests_embeddings is not None:
-        total_embeddings = requests_embeddings
+    if training_embeddings is not None and production_embeddings is not None:
+        total_embeddings = np.concatenate([production_embeddings, training_embeddings])
     else:
-        return {}, None
+        total_embeddings = production_embeddings
 
     start = datetime.now()
     if not need_fit and method == 'umap':
-        transformed_embeddings = ml_transformer.transform(requests_embeddings)
+        plottable_embeddings = transformer.transform(production_embeddings)
     else:
-        transformed_embeddings = ml_transformer.fit_transform(
+        plottable_embeddings = transformer.fit_transform(
             total_embeddings)  # TODO add ground truth labels management for semi-supervised umap
 
     logger.info(
         f'Fitting {total_embeddings.shape[0]} {total_embeddings.shape[1]}-dimensional points took '
         f'{datetime.now() - start}')
 
-    vis_eval_metrics = ml_transformer.eval(total_embeddings[:len(transformed_embeddings)], transformed_embeddings,
-                                           y=None,
-                                           evaluation_metrics=vis_metrics)  # TODO add ground truth_labels
-    top_100_neighbours = get_top_100(requests_embeddings)
-    transformed_embeddings = transformed_embeddings[:len(requests_embeddings)]
-    result['data_shape'] = transformed_embeddings.shape
-    result['data'] = transformed_embeddings.tolist()
+    vis_eval_metrics = transformer.eval(total_embeddings[:len(plottable_embeddings)], plottable_embeddings,
+                                        y=None,
+                                        evaluation_metrics=vis_metrics)  # TODO add ground truth_labels
+
+    top_100_neighbours = get_top_100_neighbours(production_embeddings)
+    plottable_embeddings = plottable_embeddings[:len(production_embeddings)]  # Slice excessive ?
+
+    result['data_shape'] = plottable_embeddings.shape
+    result['data'] = plottable_embeddings.tolist()
     result['top_100'] = top_100_neighbours
     result['visualization_metrics'] = vis_eval_metrics
-    ml_transformer.embedding_ = None
-    return result, ml_transformer
+
+    transformer.embedding_ = None  # ?
+
+    return result, transformer

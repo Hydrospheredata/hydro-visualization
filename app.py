@@ -3,14 +3,15 @@ import os
 import sys
 from datetime import datetime
 
+import numpy as np
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from loguru import logger as logging
 from pymongo import MongoClient
 
 from client import HydroServingClient, HydroServingModel
-from data_management import S3Manager, save_record, save_model_params
-from data_management import get_record, get_training_embeddings, get_requests_data
+from data_management import S3Manager, parse_embeddings_from_dataframe, parse_requests_dataframe
+from data_management import get_record, compute_training_embeddings
 from ml_transformers.utils import AVAILABLE_TRANSFORMERS
 from visualizer import transform_high_dimensional
 
@@ -44,7 +45,7 @@ db = mongo_client['visualization']
 s3manager = S3Manager()
 
 app = Flask(__name__)
-CORS(app, expose_headers=['location'])
+CORS(app)
 
 
 @app.route("/", methods=['GET'])
@@ -58,7 +59,7 @@ def buildinfo():
 
 
 @app.route('/plottable_embeddings/<method>', methods=['POST'])
-def transform(method):
+def transform(method: str):
     """
     transforms model training and requests embedding data to lower space for visualization (100D to 2D)
     using manifold learning techniques
@@ -68,90 +69,112 @@ def transform(method):
     """
 
     if method not in AVAILABLE_TRANSFORMERS:
-        return jsonify({"message": f"Transformer method {method} is  not implemented."}), 404
+        return jsonify({"message": f"Transformer method {method} is  not implemented."}), 400
 
     start = datetime.now()
+
     request_json = request.get_json()
     logging.info(f'Received request: {request_json}')
+
     model_name = request_json.get('model_name', '')
     model_version = request_json.get('model_version', '')
     data_storage_info = request_json.get('data', {})
     bucket_name = data_storage_info.get('bucket', '')
     requests_file = data_storage_info.get('requests_file', '')
-    profile_file = data_storage_info.get('profile_file', '')
+    path_to_training_data = data_storage_info.get('profile_file', '')
     vis_metrics = request_json.get('visualization_metrics', {})
 
     try:
         model = hs_client.get_model(model_name, model_version)
-        servable = hs_client.deploy_servable(model_name, model_version)
     except ValueError as e:
         return jsonify({"message": f"Unable to found {model_name}v{model_version}. Error: {e}"}), 404
     except Exception as e:
-        return jsonify({"message": f"Error creating model {model_name}v{model_version}. Error: {e}"}), 500
+        return jsonify({"message": f"Error {model_name}v{model_version}. Error: {e}"}), 500
     if not valid_model(model):
-        servable.delete()
         return jsonify({"message": f"Invalid model {model} contract: No 'embedding' field in outputs"}), 404
 
     db_model_info = get_record(db, method, model_name, str(model_version))
     parameters = db_model_info.get('parameters', {})
     result_bucket = db_model_info.get('embeddings_bucket_name', '')
-    transfomer_path = db_model_info.get('transformer_file', '')
+    path_to_transformer = db_model_info.get('transformer_file', '')
     result_path = db_model_info.get('result_file', '')
     if result_path and result_bucket:
-        result = s3manager.read_json(bucket_name=result_bucket, filename=result_path)
-        if result:
-            servable.delete()
+        plottable_data = s3manager.read_json(bucket_name=result_bucket, filename=result_path)
+        if plottable_data:
             logging.debug(f'Request handled in {datetime.now() - start}')
-            return result
-    if transfomer_path and result_bucket:
-        transformer_instance = s3manager.read_transformer(bucket_name=result_bucket, filename=transfomer_path)
+            return plottable_data
+    if path_to_transformer and result_bucket:
+        transformer = s3manager.read_transformer_model(bucket_name=result_bucket, filename=path_to_transformer)
     else:
-        transformer_instance = None
+        transformer = None
 
     # Parsing model requests and training data
-    training_df = s3manager.read_parquet(bucket_name=bucket_name, filename=profile_file)
-    requests_df = s3manager.read_parquet(bucket_name=bucket_name, filename=requests_file)
-    requests_data, requests_embeddings = get_requests_data(requests_df, model.monitoring_models())
-    if requests_embeddings is None:
-        servable.delete()
-        return jsonify({"message": f"Unable to get requests embeddings from s3://{bucket_name}/{requests_file}"}), 404
-    logging.info(f'Parsed requests data {requests_embeddings.shape}')
-    training_embeddings = get_training_embeddings(model, servable, training_df)
+    training_df = s3manager.read_parquet(bucket_name=bucket_name, filename=path_to_training_data)
+    production_requests_df = s3manager.read_parquet(bucket_name=bucket_name,
+                                                    filename=requests_file)  # FIXME Ask Yura for subsampling code
 
-    result, ml_transformer = transform_high_dimensional(method, parameters,
-                                                        training_embeddings, requests_embeddings,
-                                                        transformer_instance,
-                                                        vis_metrics=vis_metrics)
-    result.update(requests_data)
+    if 'embedding' not in production_requests_df.columns:
+        return jsonify({"message": f"Unable to get requests embeddings from s3://{bucket_name}/{requests_file}"}), 404
+
+    production_embeddings = parse_embeddings_from_dataframe(production_requests_df)
+    requests_data_dict = parse_requests_dataframe(production_requests_df, model.monitoring_models())
+    logging.info(f'Parsed requests data shape: {production_embeddings.shape}')
+
+    if not training_df:
+        training_embeddings = None
+    elif 'embedding' in training_df.columns:
+        logging.debug('Training embeddings exist')
+        training_embeddings = np.stack(training_df['embedding'].values)
+    else:  # infer embeddings using model
+        try:
+            servable = hs_client.deploy_servable(model_name, model_version)
+        except ValueError as e:
+            return jsonify({"message": f"Unable to found {model_name}v{model_version}. Error: {e}"}), 404
+        except Exception as e:
+            return jsonify({"message": f"Error {model_name}v{model_version}. Error: {e}"}), 500
+
+        training_embeddings = compute_training_embeddings(model, servable, training_df)
+        servable.delete()
+
+    plottable_data, transformer = transform_high_dimensional(method, parameters,
+                                                             training_embeddings, production_embeddings,
+                                                             transformer,
+                                                             vis_metrics=vis_metrics)
+    plottable_data.update(requests_data_dict)
     logging.info(f'Request handled in {datetime.now() - start}')
 
     if training_df and 'embedding' not in training_df.columns:
         training_df['embedding'] = training_embeddings.tolist()
-        s3manager.write_parquet(training_df, bucket_name, profile_file)
+        s3manager.write_parquet(training_df, bucket_name, path_to_training_data)
 
     if not result_bucket:
         result_bucket = bucket_name
         db_model_info['embeddings_bucket_name'] = result_bucket
-    result_path = os.path.join(os.path.dirname(profile_file), f'transformed_{method}_{model}.json')
-    res = s3manager.write_json(data=result, bucket_name=bucket_name,
-                               filename=result_path)
-    if res:
+
+    result_path = os.path.join(os.path.dirname(path_to_training_data), f'transformed_{method}_{model}.json')
+    response_saved_to_s3 = s3manager.write_json(data=plottable_data, bucket_name=bucket_name,
+                                                filename=result_path)
+    if response_saved_to_s3:
         db_model_info["result_file"] = result_path
 
-    transformer_path = os.path.join(os.path.dirname(profile_file), f'transformer_{method}_{model}')
-    res = s3manager.write_transformer(ml_transformer, bucket_name, transformer_path)
-    if res:
+    transformer_path = os.path.join(os.path.dirname(path_to_training_data), f'transformer_{method}_{model}')
+    transformer_saved_to_s3 = s3manager.write_transformer_model(transformer, bucket_name, transformer_path)
+
+    if transformer_saved_to_s3:
         db_model_info['transformer_file'] = transformer_path
 
-    save_record(db, method, db_model_info)
-    servable.delete()
-    return jsonify(result)
+    db[method].update_one({"model_name": model_name,
+                           "model_version": model_version}, {"$set": db_model_info}, upsert=True)
+
+    return jsonify(plottable_data)
 
 
 @app.route('/params/<method>', methods=['POST'])
 def set_params(method):
     """
-    write new params to db
+    Write transformer parameters for given model in database
+    so that to retrieve this data during inference of plottable embeddings in future
+        request body: see README
     :return: 200
     """
     logging.info("Received set params request")
@@ -160,11 +183,21 @@ def set_params(method):
     model_version = request_json['model_version']
     parameters = request_json['parameters']
     use_labels = request_json.get('use_label', False)
-    status = save_model_params(db, model_name, model_version, method, parameters, use_labels)
-    return jsonify({}), 200, {"status": status}
+    record = get_record(db, method, model_name, model_version)
+    record['parameters'] = parameters
+    record['use_labels'] = use_labels
+    db[method].update_one({"model_name": 'model_name',
+                           "model_version": 'model_version'}, {"$set": record}, upsert=True)
+
+    return jsonify({}), 200
 
 
 def valid_model(model: HydroServingModel) -> [bool]:
+    """
+    Check if model returns embeddings
+    :param model:
+    :return:
+    """
     output_names = list(map(lambda x: x['name'], model.contract.contract_dict['outputs']))
     if 'embedding' not in output_names:
         return False

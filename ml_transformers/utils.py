@@ -1,4 +1,5 @@
 from datetime import datetime
+from enum import Enum
 from typing import List
 
 import numpy as np
@@ -16,7 +17,13 @@ DEFAULT_PARAMETERS = {'umap':
                       }
 
 
-def get_top_100(X) -> List[List[int]]:
+class Coloring(Enum):
+    CLASS = 'class'
+    GRADIENT = 'gradient'
+    NONE = 'none'
+
+
+def get_top_100_neighbours(X) -> List[List[int]]:
     """
     Finds top 100 closest neighbours for each point
     :param X: list of points in high dimensional space

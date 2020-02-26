@@ -38,6 +38,9 @@ def get_mongo_client():
                        username=MONGO_USER, password=MONGO_PASS,
                        authSource=MONGO_AUTH_DB)
 
+cl = MongoClient(host='localhost', port=27017, maxPoolSize=200,
+                       username=MONGO_USER, password=MONGO_PASS,
+                       authSource=MONGO_AUTH_DB)
 
 mongo_client = get_mongo_client()
 
@@ -101,7 +104,7 @@ def transform(method: str):
     if result_path and result_bucket:
         plottable_data = s3manager.read_json(bucket_name=result_bucket, filename=result_path)
         if plottable_data:
-            logging.debug(f'Request handled in {datetime.now() - start}')
+            logging.info(f'Request handled in {datetime.now() - start}')
             return plottable_data
     if path_to_transformer and result_bucket:
         transformer = s3manager.read_transformer_model(bucket_name=result_bucket, filename=path_to_transformer)
@@ -151,20 +154,23 @@ def transform(method: str):
         result_bucket = bucket_name
         db_model_info['embeddings_bucket_name'] = result_bucket
 
-    result_path = os.path.join(os.path.dirname(path_to_training_data), f'transformed_{method}_{model}.json')
-    response_saved_to_s3 = s3manager.write_json(data=plottable_data, bucket_name=bucket_name,
+    result_path = os.path.join(os.path.dirname(path_to_training_data), f'transformed_{method}_{model_name}{model_version}.json')
+    s3manager.write_json(data=plottable_data, bucket_name=bucket_name,
                                                 filename=result_path)
-    if response_saved_to_s3:
-        db_model_info["result_file"] = result_path
+    db_model_info["result_file"] = result_path
 
-    transformer_path = os.path.join(os.path.dirname(path_to_training_data), f'transformer_{method}_{model}')
+    transformer_path = os.path.join(os.path.dirname(path_to_training_data), f'transformer_{method}_{model_name}{model_version}')
     transformer_saved_to_s3 = s3manager.write_transformer_model(transformer, bucket_name, transformer_path)
 
     if transformer_saved_to_s3:
         db_model_info['transformer_file'] = transformer_path
-
-    db[method].update_one({"model_name": model_name,
-                           "model_version": model_version}, {"$set": db_model_info}, upsert=True)
+    if '_id' in db_model_info:
+        db[method].update_one({"model_name": model_name,
+                           "model_version": model_version, "_id": str(db_model_info['_id'])}, {"$set": db_model_info})
+    else:
+        db[method].update_one({"model_name": model_name,
+                               "model_version": model_version},
+                              {"$set": db_model_info}, upsert=True)
 
     return jsonify(plottable_data)
 

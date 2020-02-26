@@ -1,4 +1,5 @@
 import json
+import tempfile
 from typing import Dict, Optional, List, Tuple
 
 import joblib
@@ -38,7 +39,6 @@ class S3Manager:
         with self.fs.open(f's3://{bucket_name}/{filename}', 'w') as f:
             f.write(json.dumps(data))
 
-
     def read_json(self, bucket_name: str, filename: str) -> Dict:
         '''
         Reads json
@@ -67,11 +67,18 @@ class S3Manager:
         :param filename:
         :return:
         """
-        with self.fs.open(f'{bucket_name}/{filename}', 'w') as f:
+        with tempfile.TemporaryFile() as fp:
             try:
-                joblib.dump(transformer, f)
+                joblib.dump(transformer, fp)
             except Exception as e:
                 logging.error(f'Couldn\'t dump joblib file: {bucket_name}/{filename}. Error: {e}')
+                return False
+            fp.seek(0)
+            try:
+                with self.fs.open(f's3://{bucket_name}/{filename}', 'wb') as s3file:
+                    s3file.write(fp.read())
+            except Exception as e:
+                logging.error(f'Couldn\'t write joblib file: {bucket_name}/{filename}. Error: {e}')
                 return False
         return True
 
@@ -111,7 +118,8 @@ def parse_requests_dataframe(df, monitoring_fields: List[Tuple[str, str]]) -> Di
     :param monitoring_fields: list of monitoring metrics names with comparison operator
     :return: Dict {"class_labels":{…}, "metrics":{…}}
     """
-    def get_coloring_info(column: pd.Series)->Dict:
+
+    def get_coloring_info(column: pd.Series) -> Dict:
         coloring_info = {}
         if np.issubdtype(column, np.integer):
             coloring = Coloring.CLASS

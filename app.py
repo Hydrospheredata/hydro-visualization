@@ -6,6 +6,7 @@ from datetime import datetime
 import numpy as np
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from jsonschema import Draft7Validator
 from loguru import logger as logging
 from pymongo import MongoClient
 
@@ -18,6 +19,10 @@ from visualizer import transform_high_dimensional
 with open("version.json") as version_file:
     BUILDINFO = json.load(version_file)  # Load buildinfo with branchName, headCommitId and version label
     BUILDINFO['pythonVersion'] = sys.version  # Augment with python runtime version
+
+with open('./hydro-vis-request-json-schema.json') as f:
+    REQUEST_JSON_SCHEMA = json.load(f)
+    validator = Draft7Validator(REQUEST_JSON_SCHEMA)
 
 DEBUG_ENV = bool(os.getenv("DEBUG_ENV", True))
 
@@ -38,9 +43,10 @@ def get_mongo_client():
                        username=MONGO_USER, password=MONGO_PASS,
                        authSource=MONGO_AUTH_DB)
 
+
 cl = MongoClient(host='localhost', port=27017, maxPoolSize=200,
-                       username=MONGO_USER, password=MONGO_PASS,
-                       authSource=MONGO_AUTH_DB)
+                 username=MONGO_USER, password=MONGO_PASS,
+                 authSource=MONGO_AUTH_DB)
 
 mongo_client = get_mongo_client()
 
@@ -74,9 +80,12 @@ def transform(method: str):
     if method not in AVAILABLE_TRANSFORMERS:
         return jsonify({"message": f"Transformer method {method} is  not implemented."}), 400
 
-    start = datetime.now()
-
     request_json = request.get_json()
+    if not validator.is_valid(request_json):
+        error_message = "\n".join(validator.iter_errors(request_json))
+        return jsonify({"message": error_message}), 400
+
+    start = datetime.now()
     logging.info(f'Received request: {request_json}')
 
     model_name = request_json.get('model_name', '')
@@ -154,19 +163,22 @@ def transform(method: str):
         result_bucket = bucket_name
         db_model_info['embeddings_bucket_name'] = result_bucket
 
-    result_path = os.path.join(os.path.dirname(path_to_training_data), f'transformed_{method}_{model_name}{model_version}.json')
+    result_path = os.path.join(os.path.dirname(path_to_training_data),
+                               f'transformed_{method}_{model_name}{model_version}.json')
     s3manager.write_json(data=plottable_data, bucket_name=bucket_name,
-                                                filename=result_path)
+                         filename=result_path)
     db_model_info["result_file"] = result_path
 
-    transformer_path = os.path.join(os.path.dirname(path_to_training_data), f'transformer_{method}_{model_name}{model_version}')
+    transformer_path = os.path.join(os.path.dirname(path_to_training_data),
+                                    f'transformer_{method}_{model_name}{model_version}')
     transformer_saved_to_s3 = s3manager.write_transformer_model(transformer, bucket_name, transformer_path)
 
     if transformer_saved_to_s3:
         db_model_info['transformer_file'] = transformer_path
     if '_id' in db_model_info:
         db[method].update_one({"model_name": model_name,
-                           "model_version": model_version, "_id": str(db_model_info['_id'])}, {"$set": db_model_info})
+                               "model_version": model_version, "_id": str(db_model_info['_id'])},
+                              {"$set": db_model_info})
     else:
         db[method].update_one({"model_name": model_name,
                                "model_version": model_version},

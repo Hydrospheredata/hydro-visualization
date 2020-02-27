@@ -82,7 +82,7 @@ def transform(method: str):
 
     request_json = request.get_json()
     if not validator.is_valid(request_json):
-        error_message = "\n".join(validator.iter_errors(request_json))
+        error_message = "\n".join([error.message for error in validator.iter_errors(request_json)])
         return jsonify({"message": error_message}), 400
 
     start = datetime.now()
@@ -204,8 +204,15 @@ def set_params(method):
     record = get_record(db, method, model_name, model_version)
     record['parameters'] = parameters
     record['use_labels'] = use_labels
-    db[method].update_one({"model_name": 'model_name',
-                           "model_version": 'model_version'}, {"$set": record}, upsert=True)
+
+    if '_id' in record:
+        db[method].update_one({"model_name": model_name,
+                               "model_version": model_version, "_id": str(record['_id'])},
+                              {"$set": record})
+    else:
+        db[method].update_one({"model_name": model_name,
+                               "model_version": model_version},
+                              {"$set": record}, upsert=True)
 
     return jsonify({}), 200
 

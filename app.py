@@ -102,7 +102,7 @@ def transform(method: str):
         return jsonify({"message": f"Unable to found {model_name}v{model_version}. Error: {e}"}), 404
     except Exception as e:
         return jsonify({"message": f"Error {model_name}v{model_version}. Error: {e}"}), 500
-    if not valid_model(model):
+    if not valid_embedding_model(model):
         return jsonify({"message": f"Invalid model {model} contract: No 'embedding' field in outputs"}), 404
 
     db_model_info = get_record(db, method, model_name, str(model_version))
@@ -217,7 +217,7 @@ def set_params(method):
     return jsonify({}), 200
 
 
-def valid_model(model: HydroServingModel) -> [bool]:
+def valid_embedding_model(model: HydroServingModel) -> [bool]:
     """
     Check if model returns embeddings
     :param model:

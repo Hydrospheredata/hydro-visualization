@@ -4,6 +4,8 @@ import sys
 from datetime import datetime
 
 import numpy as np
+from celery import Celery
+from celery.result import AsyncResult
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from jsonschema import Draft7Validator
@@ -56,6 +58,39 @@ s3manager = S3Manager()
 app = Flask(__name__)
 CORS(app)
 
+connection_string = f"mongodb://{MONGO_URL}:{MONGO_PORT}"
+if MONGO_USER is not None and MONGO_PASS is not None:
+    connection_string = f"mongodb://{MONGO_USER}:{MONGO_PASS}@{MONGO_URL}:{MONGO_PORT}"
+app.config['CELERY_BROKER_URL'] = f"{connection_string}/celery_broker?authSource={MONGO_AUTH_DB}"
+app.config['CELERY_RESULT_BACKEND'] = f"{connection_string}/celery_backend?authSource={MONGO_AUTH_DB}"
+
+# if MONGO_USER is not None and MONGO_PASS is not None:
+# #     connection_string = f"mongodb://{MONGO_USER}:{MONGO_PASS}@{MONGO_URL}:{MONGO_PORT}"
+# app.config['CELERY_BROKER_URL'] = 'pyamqp://'
+# app.config['CELERY_RESULT_BACKEND'] = 'rpc://'
+def make_celery(app):
+    celery = Celery(
+        app.import_name,
+        backend=app.config['CELERY_RESULT_BACKEND'],
+        broker=app.config['CELERY_BROKER_URL']
+    )
+    celery.conf.update(app.config)
+
+    class ContextTask(celery.Task):
+        def __call__(self, *args, **kwargs):
+            with app.app_context():
+                return self.run(*args, **kwargs)
+
+    celery.Task = ContextTask
+    return celery
+
+celery = make_celery(app)
+
+celery.autodiscover_tasks(["transformation_tasks"], force=True)
+# celery.conf.update(app.config)
+# celery.conf.update({"CELERY_DISABLE_RATE_LIMITS": True})
+
+import transformation_tasks
 
 @app.route("/", methods=['GET'])
 def hello():
@@ -88,13 +123,25 @@ def transform(method: str):
     start = datetime.now()
     logging.info(f'Received request: {request_json}')
 
-    model_name = request_json.get('model_name', '')
-    model_version = request_json.get('model_version', '')
-    data_storage_info = request_json.get('data', {})
-    bucket_name = data_storage_info.get('bucket', '')
-    requests_file = data_storage_info.get('requests_file', '')
+    model_name = request_json.get('model_name')
+    model_version = request_json.get('model_version')
+    data_storage_info = request_json.get('data')
+    bucket_name = data_storage_info.get('bucket')
+    requests_file = data_storage_info.get('requests_file')
     path_to_training_data = data_storage_info.get('profile_file', '')
     vis_metrics = request_json.get('visualization_metrics', {})
+
+    db_model_info = get_record(db, method, model_name, str(model_version))
+    parameters = db_model_info.get('parameters', {})
+    result_bucket = db_model_info.get('embeddings_bucket_name', '')
+    path_to_transformer = db_model_info.get('transformer_file', '')
+    result_path = db_model_info.get('result_file', '')
+
+    # if result_path and result_bucket:
+    #     plottable_data = s3manager.read_json(bucket_name=result_bucket, filename=result_path)
+    #     if plottable_data:
+    #         logging.info(f'Request handled in {datetime.now() - start}')
+    #         return plottable_data
 
     try:
         model = hs_client.get_model(model_name, model_version)
@@ -105,16 +152,6 @@ def transform(method: str):
     if not valid_embedding_model(model):
         return jsonify({"message": f"Invalid model {model} contract: No 'embedding' field in outputs"}), 404
 
-    db_model_info = get_record(db, method, model_name, str(model_version))
-    parameters = db_model_info.get('parameters', {})
-    result_bucket = db_model_info.get('embeddings_bucket_name', '')
-    path_to_transformer = db_model_info.get('transformer_file', '')
-    result_path = db_model_info.get('result_file', '')
-    if result_path and result_bucket:
-        plottable_data = s3manager.read_json(bucket_name=result_bucket, filename=result_path)
-        if plottable_data:
-            logging.info(f'Request handled in {datetime.now() - start}')
-            return plottable_data
     if path_to_transformer and result_bucket:
         transformer = s3manager.read_transformer_model(bucket_name=result_bucket, filename=path_to_transformer)
     else:
@@ -132,7 +169,7 @@ def transform(method: str):
     requests_data_dict = parse_requests_dataframe(production_requests_df, model.monitoring_models())
     logging.info(f'Parsed requests data shape: {production_embeddings.shape}')
 
-    if training_df is not None:
+    if training_df is None:
         training_embeddings = None
     elif 'embedding' in training_df.columns:
         logging.debug('Training embeddings exist')
@@ -153,7 +190,6 @@ def transform(method: str):
                                                              transformer,
                                                              vis_metrics=vis_metrics)
     plottable_data.update(requests_data_dict)
-    logging.info(f'Request handled in {datetime.now() - start}')
 
     if training_df is not None and 'embedding' not in training_df.columns:
         training_df['embedding'] = training_embeddings.tolist()
@@ -184,6 +220,7 @@ def transform(method: str):
                                "model_version": model_version},
                               {"$set": db_model_info}, upsert=True)
 
+    logging.info(f'Request handled in {datetime.now() - start}')
     return jsonify(plottable_data)
 
 
@@ -217,6 +254,43 @@ def set_params(method):
     return jsonify({}), 200
 
 
+@app.route('/jobs/<method>', methods=['POST'])
+def refit_model(method):
+    """
+    Starts refitting transformer model
+    TODO change to model_id request
+    :params model_id: model id int
+    :return: job_id
+    """
+
+    if method not in AVAILABLE_TRANSFORMERS:
+        return jsonify({"message": f"Transformer method {method} is  not implemented."}), 400
+
+    request_json = request.get_json()
+    if not validator.is_valid(request_json):
+        error_message = "\n".join([error.message for error in validator.iter_errors(request_json)])
+        return jsonify({"message": error_message}), 400
+    result = transformation_tasks.tasks.transform_task.delay(method, request_json)
+    print(result.task_id)
+    return jsonify({
+        'Task_id': result.task_id}), 202,
+
+
+@app.route('/jobs', methods=['GET'])
+def model_status():
+    """
+    Sends model status
+    :param task_id:
+    :return:
+    """
+    task_id = request.args.get('task_id')
+    result = AsyncResult(task_id)
+    return jsonify({
+        'state': result.state,
+        'task_id': task_id
+    })
+
+
 def valid_embedding_model(model: HydroServingModel) -> [bool]:
     """
     Check if model returns embeddings
@@ -228,6 +302,7 @@ def valid_embedding_model(model: HydroServingModel) -> [bool]:
     if 'embedding' not in output_names:
         return False
     return True
+
 
 
 if __name__ == "__main__":

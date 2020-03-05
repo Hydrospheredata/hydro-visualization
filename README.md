@@ -128,7 +128,6 @@ collection: umap, trimap, tsne
 {
 "model_name": "adult_scalar",
 "model_version": "1",
-"date_trained": "datetime",
 "embeddings_bucket_name": "hydro-vis",
 "result_file": "result.json",
 "transformer_file": "umap_transformer",

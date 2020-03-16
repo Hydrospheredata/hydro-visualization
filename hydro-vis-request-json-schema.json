@@ -35,7 +35,7 @@
       "title": "The Data Schema",
       "required": [
         "bucket",
-        "requests_file"
+        "production_data_file"
       ],
       "properties": {
         "bucket": {
@@ -47,19 +47,19 @@
           ],
           "pattern": "^(.*)$"
         },
-        "requests_file": {
-          "$id": "#/properties/data/properties/requests_file",
+        "production_data_file": {
+          "$id": "#/properties/data/properties/production_data_file",
           "type": "string",
-          "title": "The Requests_file Schema",
+          "title": "The Production_data_file Schema",
           "examples": [
             "adult/requests.parquet"
           ],
           "pattern": "^(.*)$"
         },
-        "profile_file": {
-          "$id": "#/properties/data/properties/profile_file",
+        "profile_data_file": {
+          "$id": "#/properties/data/properties/profile_data_file",
           "type": "string",
-          "title": "The Profile_file Schema",
+          "title": "The Profile_data_file Schema",
           "examples": [
             "adult/training.parquet"
           ],

@@ -1,22 +1,18 @@
 import json
-import os
 import sys
-from datetime import datetime
 
-import numpy as np
 from celery import Celery
-from celery.result import AsyncResult
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from jsonschema import Draft7Validator
 from loguru import logger as logging
-from pymongo import MongoClient
 
 from client import HydroServingClient, HydroServingModel
-from data_management import S3Manager, parse_embeddings_from_dataframe, parse_requests_dataframe
-from data_management import get_record, compute_training_embeddings
+from conf import SERVING_URL, MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, DEBUG_ENV
+from data_management import S3Manager, update_record, \
+    get_mongo_client
+from data_management import get_record
 from ml_transformers.utils import AVAILABLE_TRANSFORMERS
-from visualizer import transform_high_dimensional
 
 with open("version.json") as version_file:
     BUILDINFO = json.load(version_file)  # Load buildinfo with branchName, headCommitId and version label
@@ -26,31 +22,30 @@ with open('./hydro-vis-request-json-schema.json') as f:
     REQUEST_JSON_SCHEMA = json.load(f)
     validator = Draft7Validator(REQUEST_JSON_SCHEMA)
 
-DEBUG_ENV = bool(os.getenv("DEBUG_ENV", True))
-
-REQSTORE_URL = os.getenv("REQSTORE_URL", "managerui:9090")
-SERVING_URL = os.getenv("SERVING_URL", "managerui:9090")
-
-MONGO_URL = os.getenv("MONGO_URL", "localhost")
-MONGO_PORT = int(os.getenv("MONGO_PORT", 27017))
-MONGO_AUTH_DB = os.getenv("MONGO_AUTH_DB", "admin")
-MONGO_USER = os.getenv("MONGO_USER")
-MONGO_PASS = os.getenv("MONGO_PASS")
+# DEBUG_ENV = bool(os.getenv("DEBUG_ENV", True))
+#
+# REQSTORE_URL = os.getenv("REQSTORE_URL", "localhost:9090")  # hydro-serving.dev.hydro
+# SERVING_URL = os.getenv("SERVING_URL", "localhost:9090")
+#
+# MONGO_URL = os.getenv("MONGO_URL", "localhost")
+# MONGO_PORT = int(os.getenv("MONGO_PORT", 27017))
+# MONGO_AUTH_DB = os.getenv("MONGO_AUTH_DB", "admin")
+# MONGO_USER = os.getenv("MONGO_USER")
+# MONGO_PASS = os.getenv("MONGO_PASS")
 
 hs_client = HydroServingClient(SERVING_URL)
 
+# def get_mongo_client():
+#     return MongoClient(host=MONGO_URL, port=MONGO_PORT, maxPoolSize=200,
+#                        username=MONGO_USER, password=MONGO_PASS,
+#                        authSource=MONGO_AUTH_DB)
+#
+#
+# cl = MongoClient(host='localhost', port=27017, maxPoolSize=200,
+#                  username=MONGO_USER, password=MONGO_PASS,
+#                  authSource=MONGO_AUTH_DB)
 
-def get_mongo_client():
-    return MongoClient(host=MONGO_URL, port=MONGO_PORT, maxPoolSize=200,
-                       username=MONGO_USER, password=MONGO_PASS,
-                       authSource=MONGO_AUTH_DB)
-
-
-cl = MongoClient(host='localhost', port=27017, maxPoolSize=200,
-                 username=MONGO_USER, password=MONGO_PASS,
-                 authSource=MONGO_AUTH_DB)
-
-mongo_client = get_mongo_client()
+mongo_client = get_mongo_client(MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB)
 
 db = mongo_client['visualization']
 s3manager = S3Manager()
@@ -63,6 +58,7 @@ if MONGO_USER is not None and MONGO_PASS is not None:
     connection_string = f"mongodb://{MONGO_USER}:{MONGO_PASS}@{MONGO_URL}:{MONGO_PORT}"
 app.config['CELERY_BROKER_URL'] = f"{connection_string}/celery_broker?authSource={MONGO_AUTH_DB}"
 app.config['CELERY_RESULT_BACKEND'] = f"{connection_string}/celery_backend?authSource={MONGO_AUTH_DB}"
+
 
 # if MONGO_USER is not None and MONGO_PASS is not None:
 # #     connection_string = f"mongodb://{MONGO_USER}:{MONGO_PASS}@{MONGO_URL}:{MONGO_PORT}"
@@ -84,6 +80,7 @@ def make_celery(app):
     celery.Task = ContextTask
     return celery
 
+
 celery = make_celery(app)
 
 celery.autodiscover_tasks(["transformation_tasks"], force=True)
@@ -91,6 +88,7 @@ celery.autodiscover_tasks(["transformation_tasks"], force=True)
 # celery.conf.update({"CELERY_DISABLE_RATE_LIMITS": True})
 
 import transformation_tasks
+
 
 @app.route("/", methods=['GET'])
 def hello():
@@ -110,8 +108,8 @@ def transform(method: str):
     :param method: umap /trimap /tsne
             request body: see README
             response body: see README
+    :return: task_id if not found
     """
-
     if method not in AVAILABLE_TRANSFORMERS:
         return jsonify({"message": f"Transformer method {method} is  not implemented."}), 400
 
@@ -120,108 +118,12 @@ def transform(method: str):
         error_message = "\n".join([error.message for error in validator.iter_errors(request_json)])
         return jsonify({"message": error_message}), 400
 
-    start = datetime.now()
     logging.info(f'Received request: {request_json}')
 
-    model_name = request_json.get('model_name')
-    model_version = request_json.get('model_version')
-    data_storage_info = request_json.get('data')
-    bucket_name = data_storage_info.get('bucket')
-    requests_file = data_storage_info.get('requests_file')
-    path_to_training_data = data_storage_info.get('profile_file', '')
-    vis_metrics = request_json.get('visualization_metrics', {})
+    result = transformation_tasks.tasks.transform_task.delay(method, request_json)
 
-    db_model_info = get_record(db, method, model_name, str(model_version))
-    parameters = db_model_info.get('parameters', {})
-    result_bucket = db_model_info.get('embeddings_bucket_name', '')
-    path_to_transformer = db_model_info.get('transformer_file', '')
-    result_path = db_model_info.get('result_file', '')
-
-    # if result_path and result_bucket:
-    #     plottable_data = s3manager.read_json(bucket_name=result_bucket, filename=result_path)
-    #     if plottable_data:
-    #         logging.info(f'Request handled in {datetime.now() - start}')
-    #         return plottable_data
-
-    try:
-        model = hs_client.get_model(model_name, model_version)
-    except ValueError as e:
-        return jsonify({"message": f"Unable to found {model_name}v{model_version}. Error: {e}"}), 404
-    except Exception as e:
-        return jsonify({"message": f"Error {model_name}v{model_version}. Error: {e}"}), 500
-    if not valid_embedding_model(model):
-        return jsonify({"message": f"Invalid model {model} contract: No 'embedding' field in outputs"}), 404
-
-    if path_to_transformer and result_bucket:
-        transformer = s3manager.read_transformer_model(bucket_name=result_bucket, filename=path_to_transformer)
-    else:
-        transformer = None
-
-    # Parsing model requests and training data
-    training_df = s3manager.read_parquet(bucket_name=bucket_name, filename=path_to_training_data)
-    production_requests_df = s3manager.read_parquet(bucket_name=bucket_name,
-                                                    filename=requests_file)  # FIXME Ask Yura for subsampling code
-
-    if 'embedding' not in production_requests_df.columns:
-        return jsonify({"message": f"Unable to get requests embeddings from s3://{bucket_name}/{requests_file}"}), 404
-
-    production_embeddings = parse_embeddings_from_dataframe(production_requests_df)
-    requests_data_dict = parse_requests_dataframe(production_requests_df, model.monitoring_models())
-    logging.info(f'Parsed requests data shape: {production_embeddings.shape}')
-
-    if training_df is None:
-        training_embeddings = None
-    elif 'embedding' in training_df.columns:
-        logging.debug('Training embeddings exist')
-        training_embeddings = np.stack(training_df['embedding'].values)
-    else:  # infer embeddings using model
-        try:
-            servable = hs_client.deploy_servable(model_name, model_version)
-        except ValueError as e:
-            return jsonify({"message": f"Unable to found {model_name}v{model_version}. Error: {e}"}), 404
-        except Exception as e:
-            return jsonify({"message": f"Error {model_name}v{model_version}. Error: {e}"}), 500
-
-        training_embeddings = compute_training_embeddings(model, servable, training_df)
-        servable.delete()
-
-    plottable_data, transformer = transform_high_dimensional(method, parameters,
-                                                             training_embeddings, production_embeddings,
-                                                             transformer,
-                                                             vis_metrics=vis_metrics)
-    plottable_data.update(requests_data_dict)
-
-    if training_df is not None and 'embedding' not in training_df.columns:
-        training_df['embedding'] = training_embeddings.tolist()
-        s3manager.write_parquet(training_df, bucket_name, path_to_training_data)
-
-    if not result_bucket:
-        result_bucket = bucket_name
-        db_model_info['embeddings_bucket_name'] = result_bucket
-
-    result_path = os.path.join(os.path.dirname(path_to_training_data),
-                               f'transformed_{method}_{model_name}{model_version}.json')
-    s3manager.write_json(data=plottable_data, bucket_name=bucket_name,
-                         filename=result_path)
-    db_model_info["result_file"] = result_path
-
-    transformer_path = os.path.join(os.path.dirname(path_to_training_data),
-                                    f'transformer_{method}_{model_name}{model_version}')
-    transformer_saved_to_s3 = s3manager.write_transformer_model(transformer, bucket_name, transformer_path)
-
-    if transformer_saved_to_s3:
-        db_model_info['transformer_file'] = transformer_path
-    if '_id' in db_model_info:
-        db[method].update_one({"model_name": model_name,
-                               "model_version": model_version, "_id": str(db_model_info['_id'])},
-                              {"$set": db_model_info})
-    else:
-        db[method].update_one({"model_name": model_name,
-                               "model_version": model_version},
-                              {"$set": db_model_info}, upsert=True)
-
-    logging.info(f'Request handled in {datetime.now() - start}')
-    return jsonify(plottable_data)
+    return jsonify({
+        'Task_id': result.task_id}), 202
 
 
 @app.route('/params/<method>', methods=['POST'])
@@ -241,16 +143,9 @@ def set_params(method):
     record = get_record(db, method, model_name, model_version)
     record['parameters'] = parameters
     record['use_labels'] = use_labels
-
-    if '_id' in record:
-        db[method].update_one({"model_name": model_name,
-                               "model_version": model_version, "_id": str(record['_id'])},
-                              {"$set": record})
-    else:
-        db[method].update_one({"model_name": model_name,
-                               "model_version": model_version},
-                              {"$set": record}, upsert=True)
-
+    record['result_file'] = ''
+    record['transformer_file'] = ''
+    update_record(db, method, record, model_name, model_version)
     return jsonify({}), 200
 
 
@@ -262,6 +157,7 @@ def refit_model(method):
     :params model_id: model id int
     :return: job_id
     """
+    refit_transformer = request.args.get('refit_transformer', True)
 
     if method not in AVAILABLE_TRANSFORMERS:
         return jsonify({"message": f"Transformer method {method} is  not implemented."}), 400
@@ -270,10 +166,16 @@ def refit_model(method):
     if not validator.is_valid(request_json):
         error_message = "\n".join([error.message for error in validator.iter_errors(request_json)])
         return jsonify({"message": error_message}), 400
+    model_name = request_json.get('model_name')
+    model_version = str(request_json.get('model_version'))
+    db_model_info = get_record(db, method, model_name, model_version)
+    db_model_info['result_file'] = ''  # forget about old results
+    if refit_transformer:
+        db_model_info['transformer_file'] = ''
+    update_record(db, method, db_model_info, model_name, model_version)
     result = transformation_tasks.tasks.transform_task.delay(method, request_json)
-    print(result.task_id)
     return jsonify({
-        'Task_id': result.task_id}), 202,
+        'task_id': result.task_id}), 202
 
 
 @app.route('/jobs', methods=['GET'])
@@ -284,11 +186,24 @@ def model_status():
     :return:
     """
     task_id = request.args.get('task_id')
-    result = AsyncResult(task_id)
-    return jsonify({
-        'state': result.state,
+    task = transformation_tasks.tasks.transform_task.AsyncResult(task_id)
+    response = {
+        'state': task.state,
         'task_id': task_id
-    })
+    }
+    if task.state == 'PENDING':
+        # job did not start yet, do nothing
+        pass
+    elif task.state == 'SUCCESS':
+        # job completed, return result
+        result = task.get()
+
+        response['result'] = result
+    else:
+        # something went wrong in the background job, return the exception raised
+        response['description'] = task.info
+
+    return jsonify(response)
 
 
 def valid_embedding_model(model: HydroServingModel) -> [bool]:
@@ -302,7 +217,6 @@ def valid_embedding_model(model: HydroServingModel) -> [bool]:
     if 'embedding' not in output_names:
         return False
     return True
-
 
 
 if __name__ == "__main__":

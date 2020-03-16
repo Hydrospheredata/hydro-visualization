@@ -10,7 +10,7 @@ Pillow
 umap-learn
 loguru
 flask_cors
-pymongo==3.10.0
+pymongo==3.10.1
 s3fs==0.4.0
 joblib
 hydro-serving-grpc==2.2.1
@@ -19,3 +19,4 @@ PyYAML
 pyarrow
 tqdm
 jsonschema==3.2.0
+celery==4.4.1

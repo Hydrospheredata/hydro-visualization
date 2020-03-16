@@ -8,11 +8,18 @@ import pandas as pd
 import pyarrow.parquet as pq
 import s3fs
 from loguru import logger as logging
+from pymongo import MongoClient
 from tqdm import tqdm
 
 from client import HydroServingModel, HydroServingServable
 from ml_transformers.transformer import Transformer
 from ml_transformers.utils import DEFAULT_PARAMETERS, Coloring
+
+
+def get_mongo_client(mongo_url, mongo_port, mongo_user, mongo_pass, mongo_auth_db):
+    return MongoClient(host=mongo_url, port=mongo_port, maxPoolSize=200,
+                       username=mongo_user, password=mongo_pass,
+                       authSource=mongo_auth_db)
 
 
 class S3Manager:
@@ -178,6 +185,15 @@ def get_record(db, method, model_name, model_version) -> Dict:
                 "use_labels": False}
     else:
         return existing_record
+
+
+def update_record(db, method, record, model_name, model_version):
+    model_version = str(model_version)
+    if '_id' in record:
+        del record['_id']
+    db[method].update_one({"model_name": model_name,
+                           "model_version": model_version},
+                          {"$set": record}, upsert=True)
 
 
 def compute_training_embeddings(model: HydroServingModel, servable: HydroServingServable,

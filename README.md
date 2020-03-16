@@ -108,8 +108,8 @@ POST /plottable_embeddings/umap
 {        "model_name": "adult_scalar",
          "model_version": 1,
          "data": { "bucket": "hydro-vis",
-                   "requests_file": "adult/requests.parquet",
-                   "profile_file": "adult/training.parquet"
+                   "production_data_file": "adult/requests.parquet",
+                   "profile_data_file": "adult/training.parquet"
                    },
          "visualization_metrics": ["global_score", "sammon_error", "auc_score", "stability_score", "msid", "clustering"]
 }

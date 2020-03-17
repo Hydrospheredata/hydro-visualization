@@ -24,6 +24,8 @@ MONGO_PASS = os.getenv("MONGO_PASS")
 
 ## API
 
+Whole API description is available [here](openapi.yaml)
+
 1.**POST** /plottable_embeddings/<method>
     
     transformer - manifold learning transformer from ["umap", "trimap", "tsne"]. For now only ["umap"].

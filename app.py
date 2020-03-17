@@ -22,28 +22,7 @@ with open('./hydro-vis-request-json-schema.json') as f:
     REQUEST_JSON_SCHEMA = json.load(f)
     validator = Draft7Validator(REQUEST_JSON_SCHEMA)
 
-# DEBUG_ENV = bool(os.getenv("DEBUG_ENV", True))
-#
-# REQSTORE_URL = os.getenv("REQSTORE_URL", "localhost:9090")  # hydro-serving.dev.hydro
-# SERVING_URL = os.getenv("SERVING_URL", "localhost:9090")
-#
-# MONGO_URL = os.getenv("MONGO_URL", "localhost")
-# MONGO_PORT = int(os.getenv("MONGO_PORT", 27017))
-# MONGO_AUTH_DB = os.getenv("MONGO_AUTH_DB", "admin")
-# MONGO_USER = os.getenv("MONGO_USER")
-# MONGO_PASS = os.getenv("MONGO_PASS")
-
 hs_client = HydroServingClient(SERVING_URL)
-
-# def get_mongo_client():
-#     return MongoClient(host=MONGO_URL, port=MONGO_PORT, maxPoolSize=200,
-#                        username=MONGO_USER, password=MONGO_PASS,
-#                        authSource=MONGO_AUTH_DB)
-#
-#
-# cl = MongoClient(host='localhost', port=27017, maxPoolSize=200,
-#                  username=MONGO_USER, password=MONGO_PASS,
-#                  authSource=MONGO_AUTH_DB)
 
 mongo_client = get_mongo_client(MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB)
 
@@ -59,11 +38,6 @@ if MONGO_USER is not None and MONGO_PASS is not None:
 app.config['CELERY_BROKER_URL'] = f"{connection_string}/celery_broker?authSource={MONGO_AUTH_DB}"
 app.config['CELERY_RESULT_BACKEND'] = f"{connection_string}/celery_backend?authSource={MONGO_AUTH_DB}"
 
-
-# if MONGO_USER is not None and MONGO_PASS is not None:
-# #     connection_string = f"mongodb://{MONGO_USER}:{MONGO_PASS}@{MONGO_URL}:{MONGO_PORT}"
-# app.config['CELERY_BROKER_URL'] = 'pyamqp://'
-# app.config['CELERY_RESULT_BACKEND'] = 'rpc://'
 def make_celery(app):
     celery = Celery(
         app.import_name,

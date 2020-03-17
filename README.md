@@ -24,8 +24,8 @@ MONGO_PASS = os.getenv("MONGO_PASS")
 
 ## API
 
-1.**POST** /plottable_embeddings/<transformer>
-
+1.**POST** /plottable_embeddings/<method>
+    
     transformer - manifold learning transformer from ["umap", "trimap", "tsne"]. For now only ["umap"].
   
    request json:   
@@ -41,38 +41,79 @@ MONGO_PASS = os.getenv("MONGO_PASS")
  
  
 ```
-    
-   response json:
-```json
-{"data_shape": [2, 2],
- "data": [[0.1, 0.2], [0.3, 0.4]],
-"request_ids": [200,2001],
- "class_labels": {
-                 "confidence": {"data": [0.1, 0.2, 0.3],
-                                 "coloring_type":  "gradient"},
-                 "class": {"data": [1, 2, 1, 3, 1],
-                           "coloring_type":  "class",
-                           "classes":  [1, 2, 3]}
-                   },
- "metrics": {
-             "anomality": {
-                           "scores": [0.1, 0.2, 0.5, 0.2],
-                           "threshold": 0.5,
-                           "operation": "Eq",
-                           "coloring_type": "gradient"
-                           }
-             },
- "top_100": [[2, 3, 4], []],  
- "visualization_metrics": {
-                           "global_score": 0.9,
-                           "sammon_error": 0.1,
-                           "msid_score": 200
-                           }
-}
 
+  response json:
+```json
+{"task_id":  "22e86484-7d90-49fd-a3e1-329b978ee18c"}
 ```
 
-  
+2. **POST** /jobs/<method>
+
+    request_json:
+```json
+{        "model_name": "adult_scalar",
+         "model_version": 1,
+         "data": { "bucket": "hydro-vis",
+                   "requests_file": "adult/requests.parquet",
+                   "profile_file": "adult/training.parquet"
+                   },
+         "visualization_metrics": ["global_score", "sammon_error", "auc_score", "stability_score", "msid", "clustering"]
+}
+```
+
+  response json:
+```json
+{"task_id":  "22e86484-7d90-49fd-a3e1-329b978ee18c"}
+```
+3. **GET** /jobs?task_id=22e86484-7d90-49fd-a3e1-329b978ee18c
+
+Returns state of a task and result if ready
+
+states: = ['PENDING', 'RECEIVED', 'STARTED', 'FAILURE', 'REVOKED',  'RETRY'] (Source: [Celery Docs](https://docs.celeryproject.org/en/latest/reference/celery.states.html#all-states))
+
+   response_json(SUCCESS):
+```json
+{
+      "result": {"data_shape": [2, 2],
+                 "data": [[0.1, 0.2], [0.3, 0.4]],
+                "request_ids": [200,2001],
+                 "class_labels": {
+                                 "confidence": {"data": [0.1, 0.2, 0.3],
+                                                 "coloring_type":  "gradient"},
+                                 "class": {"data": [1, 2, 1, 3, 1],
+                                           "coloring_type":  "class",
+                                           "classes":  [1, 2, 3]}
+                                   },
+                 "metrics": {
+                             "anomality": {
+                                           "scores": [0.1, 0.2, 0.5, 0.2],
+                                           "threshold": 0.5,
+                                           "operation": "Eq",
+                                           "coloring_type": "gradient"
+                                           }
+                             },
+                 "top_100": [[2, 3, 4], []],  
+                 "visualization_metrics": {
+                                           "global_score": 0.9,
+                                           "sammon_error": 0.1,
+                                           "msid_score": 200
+                                           }
+                 },
+      "state":  "SUCCESS",
+      "task_id": "22e86484-7d90-49fd-a3e1-329b978ee18c",
+      "description": ""
+
+}
+```
+
+   response_json (PENDING):
+```json
+{
+    "state": "PENDING",
+    "task_id": "22e86484-7d90-49fd-a3e1-329b978ee18c"
+}
+```
+
 2. **POST** /params/<method>
   
     **request format**:

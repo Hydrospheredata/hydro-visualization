@@ -126,29 +126,6 @@ def transform(method: str):
         'Task_id': result.task_id}), 202
 
 
-@app.route('/params/<method>', methods=['POST'])
-def set_params(method):
-    """
-    Write transformer parameters for given model in database
-    so that to retrieve this data during inference of plottable embeddings in future
-        request body: see README
-    :return: 200
-    """
-    logging.info("Received set params request")
-    request_json = request.get_json()
-    model_name = request_json['model_name']
-    model_version = request_json['model_version']
-    parameters = request_json['parameters']
-    use_labels = request_json.get('use_label', False)
-    record = get_record(db, method, model_name, model_version)
-    record['parameters'] = parameters
-    record['use_labels'] = use_labels
-    record['result_file'] = ''
-    record['transformer_file'] = ''
-    update_record(db, method, record, model_name, model_version)
-    return jsonify({}), 200
-
-
 @app.route('/jobs/<method>', methods=['POST'])
 def refit_model(method):
     """
@@ -176,6 +153,29 @@ def refit_model(method):
     result = transformation_tasks.tasks.transform_task.delay(method, request_json)
     return jsonify({
         'task_id': result.task_id}), 202
+
+
+@app.route('/params/<method>', methods=['POST'])
+def set_params(method):
+    """
+    Write transformer parameters for given model in database
+    so that to retrieve this data during inference of plottable embeddings in future
+        request body: see README
+    :return: 200
+    """
+    logging.info("Received set params request")
+    request_json = request.get_json()
+    model_name = request_json['model_name']
+    model_version = request_json['model_version']
+    parameters = request_json['parameters']
+    use_labels = request_json.get('use_label', False)
+    record = get_record(db, method, model_name, model_version)
+    record['parameters'] = parameters
+    record['use_labels'] = use_labels
+    record['result_file'] = ''
+    record['transformer_file'] = ''
+    update_record(db, method, record, model_name, model_version)
+    return jsonify({}), 200
 
 
 @app.route('/jobs', methods=['GET'])

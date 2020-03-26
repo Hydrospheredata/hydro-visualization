@@ -5,7 +5,6 @@ import numpy as np
 from loguru import logger
 
 from ml_transformers.transformer import UmapTransformer, Transformer
-from ml_transformers.utils import get_top_100_neighbours
 
 
 def transform_high_dimensional(method, parameters,
@@ -57,12 +56,10 @@ def transform_high_dimensional(method, parameters,
                                         y=None,
                                         evaluation_metrics=vis_metrics)  # TODO add ground truth_labels
 
-    top_100_neighbours = get_top_100_neighbours(production_embeddings)
     plottable_embeddings = plottable_embeddings[:len(production_embeddings)]  # Slice excessive ?
 
     result['data_shape'] = plottable_embeddings.shape
     result['data'] = plottable_embeddings.tolist()
-    result['top_100'] = top_100_neighbours
     result['visualization_metrics'] = vis_eval_metrics
 
     transformer.embedding_ = None  # ?

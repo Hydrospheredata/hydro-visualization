@@ -7,13 +7,14 @@ import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq
 import s3fs
+from hydrosdk.model import Model
 from loguru import logger as logging
 from pymongo import MongoClient
 from tqdm import tqdm
 
-from client import HydroServingModel, HydroServingServable
+from client import HydroServingServable
 from ml_transformers.transformer import Transformer
-from ml_transformers.utils import DEFAULT_PARAMETERS, Coloring
+from ml_transformers.utils import DEFAULT_PARAMETERS, Coloring, get_top_100_neighbours
 
 
 def get_mongo_client(mongo_url, mongo_port, mongo_user, mongo_pass, mongo_auth_db):
@@ -114,7 +115,7 @@ class S3Manager:
             return transformer
 
 
-def parse_requests_dataframe(df, monitoring_fields: List[Tuple[str, str]]) -> Dict:
+def parse_requests_dataframe(df, monitoring_fields: List[Tuple[str, str]], embeddings: np.ndarray) -> Dict:
     """
     Extracts:
         - class prediction,
@@ -140,10 +141,17 @@ def parse_requests_dataframe(df, monitoring_fields: List[Tuple[str, str]]) -> Di
 
     requests_ids = df['request_id'].values.tolist()
 
+    top_100_neighbours = get_top_100_neighbours(embeddings)
+    counterfactuals = [[] for _ in range(len(top_100_neighbours))]
     predictions, confidence = [], []
     if 'class' in df.columns:
         predictions = {'data': df['class'].values.tolist()}
         predictions.update(get_coloring_info(df['class']))
+        class_labels = df['class'].values.tolist()
+        counterfactuals = list(
+            map(lambda i: list(filter(lambda x: class_labels[x] != class_labels[i], top_100_neighbours[i])),
+                range(len(top_100_neighbours))))
+        del class_labels
 
     if 'confidence' in df.columns:
         confidence = {'data': df['confidence'].values.tolist()}
@@ -164,7 +172,9 @@ def parse_requests_dataframe(df, monitoring_fields: List[Tuple[str, str]]) -> Di
 
     return {'class_labels': class_info,
             'metrics': monitoring_data,
-            'requests_ids': requests_ids}
+            'requests_ids': requests_ids,
+            'top_100': top_100_neighbours,
+            'counterfactuals': counterfactuals}
 
 
 def parse_embeddings_from_dataframe(df):
@@ -196,7 +206,7 @@ def update_record(db, method, record, model_name, model_version):
                           {"$set": record}, upsert=True)
 
 
-def compute_training_embeddings(model: HydroServingModel, servable: HydroServingServable,
+def compute_training_embeddings(model: Model, servable: HydroServingServable,
                                 training_data: pd.DataFrame) -> Optional[np.ndarray]:
     """
     Computes embeddings from training data using model servable
@@ -205,10 +215,7 @@ def compute_training_embeddings(model: HydroServingModel, servable: HydroServing
     :param training_data: Dataframe with training data
     :return: np.ndarray with embeddings or None if failed
     """
-    if not training_data:
-        return None
-
-    input_names = list(map(lambda x: x['name'], model.contract.contract_dict['inputs']))
+    input_names = list(map(lambda x: x.name, model.contract.predict.inputs))
     if len(set(input_names) - set(training_data.columns)) != 0:
         raise ValueError(
             f'Input fields ({input_names}) are not compatible with data fields ({set(training_data.columns)})')

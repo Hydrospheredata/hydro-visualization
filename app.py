@@ -4,6 +4,7 @@ import sys
 from celery import Celery
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from hydrosdk import cluster
 from jsonschema import Draft7Validator
 from loguru import logger as logging
 
@@ -23,6 +24,7 @@ with open('./hydro-vis-request-json-schema.json') as f:
     validator = Draft7Validator(REQUEST_JSON_SCHEMA)
 
 hs_client = HydroServingClient(SERVING_URL)
+hs_cluster = cluster.Cluster.connect("http://localhost:80")
 
 mongo_client = get_mongo_client(MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB)
 

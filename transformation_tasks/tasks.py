@@ -1,27 +1,25 @@
 import os
-
-import os
 from datetime import datetime
 
 import numpy as np
+from hydrosdk.model import Model
+from hydrosdk.monitoring import MetricSpec
 from loguru import logger as logging
 
-from app import celery, s3manager, hs_client
-from client import HydroServingModel
+from app import celery, s3manager, hs_client, hs_cluster
 from conf import MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB
 from data_management import get_record, parse_embeddings_from_dataframe, parse_requests_dataframe, \
     compute_training_embeddings, update_record, get_mongo_client
 from visualizer import transform_high_dimensional
 
 
-def valid_embedding_model(model: HydroServingModel) -> [bool]:
+def valid_embedding_model(model: Model) -> [bool]:
     """
     Check if model returns embeddings
     :param model:
     :return:
     """
-
-    output_names = list(map(lambda x: x['name'], model.contract.contract_dict['outputs']))
+    output_names = [field.name for field in model.contract.predict.outputs]
     if 'embedding' not in output_names:
         return False
     return True
@@ -29,7 +27,6 @@ def valid_embedding_model(model: HydroServingModel) -> [bool]:
 
 @celery.task(bind=True)
 def transform_task(self, method, request_json):
-    # TODO Change task status
     start = datetime.now()
     mongo_client = get_mongo_client(MONGO_URL,  MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB)
     db = mongo_client['visualization']
@@ -53,7 +50,7 @@ def transform_task(self, method, request_json):
             return {"result": plottable_data}, 200
 
     try:
-        model = hs_client.get_model(model_name, int(model_version))
+        model = Model.find(hs_cluster, model_name, int(model_version))
     except ValueError as e:
         return {"message": f"Unable to find {model_name}v{model_version}. Error: {e}"}, 404
     except Exception as e:
@@ -66,7 +63,8 @@ def transform_task(self, method, request_json):
     else:
         transformer = None
 
-    # Parsing model requests and training data
+
+    # Parsing model requests and training data   # TODO SDK
     training_df = s3manager.read_parquet(bucket_name=bucket_name, filename=path_to_training_data)
     production_requests_df = s3manager.read_parquet(bucket_name=bucket_name,
                                                     filename=requests_file)  # FIXME Ask Yura for subsampling code
@@ -75,17 +73,20 @@ def transform_task(self, method, request_json):
         return f"Unable to get requests embeddings from s3://{bucket_name}/{requests_file}", 404
 
     production_embeddings = parse_embeddings_from_dataframe(production_requests_df)
-    requests_data_dict = parse_requests_dataframe(production_requests_df, model.monitoring_models())
+    monitoring_models_conf = [(metric.name, metric.config.threshold_op) for metric in MetricSpec.list_for_model(hs_cluster, model.id)]
+    requests_data_dict = parse_requests_dataframe(production_requests_df, monitoring_models_conf, production_embeddings)
+
+
     logging.info(f'Parsed requests data shape: {production_embeddings.shape}')
 
     if training_df is None:
         training_embeddings = None
-    elif 'embedding' in training_df.columns:
+    elif 'embedding' in training_df.columns:  # TODO Remove
         logging.debug('Training embeddings exist')
         training_embeddings = np.stack(training_df['embedding'].values)
     else:  # infer embeddings using model
         try:
-            servable = hs_client.deploy_servable(model_name, model_version)
+            servable = hs_client.deploy_servable(model_name, int(model_version))  # TODO SDK
         except ValueError as e:
             return {"message": f"Unable to find {model_name}v{model_version}. Error: {e}"}, 404
         except Exception as e:

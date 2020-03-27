@@ -1,6 +1,7 @@
 import json
 import sys
 
+import grpc
 from celery import Celery
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -9,7 +10,8 @@ from jsonschema import Draft7Validator
 from loguru import logger as logging
 
 from client import HydroServingClient, HydroServingModel
-from conf import SERVING_URL, MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, DEBUG_ENV
+from conf import SERVING_URL, MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, DEBUG_ENV, \
+    CLUSTER_URL, SECURE
 from data_management import S3Manager, update_record, \
     get_mongo_client
 from data_management import get_record
@@ -22,10 +24,11 @@ with open("version.json") as version_file:
 with open('./hydro-vis-request-json-schema.json') as f:
     REQUEST_JSON_SCHEMA = json.load(f)
     validator = Draft7Validator(REQUEST_JSON_SCHEMA)
-
-hs_client = HydroServingClient(SERVING_URL)
-hs_cluster = cluster.Cluster.connect("http://localhost:80")
-
+if SECURE:
+    hs_client = HydroServingClient(SERVING_URL, credentials=grpc.ssl_channel_credentials())
+else:
+    hs_client = HydroServingClient(SERVING_URL)
+hs_cluster = cluster.Cluster.connect(CLUSTER_URL)
 mongo_client = get_mongo_client(MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB)
 
 db = mongo_client['visualization']

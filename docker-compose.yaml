@@ -4,6 +4,7 @@ services:
 
 
   hydrovis-worker:
+    build: .
     environment:
       - MONGO_URL=mongodb
       - SERVING_URL=
@@ -11,14 +12,13 @@ services:
       - SECURE=True
       - AWS_ACCESS_KEY_ID=
       - AWS_SECRET_ACCESS_KEY=
-    image: hydrovis-worker
-    container_name: hydrovis-worker
     command: celery -A app.celery worker
     depends_on:
       - hydrovis
       - mongodb
 
   hydrovis:
+    build: .
     environment:
       - MONGO_URL=mongodb
       - SERVING_URL=
@@ -26,8 +26,6 @@ services:
       - SECURE=True
       - AWS_ACCESS_KEY_ID=
       - AWS_SECRET_ACCESS_KEY=
-    image: hydrovis
-    container_name: hydrovis
     command: python app.py
     ports:
       - "5000:5000"

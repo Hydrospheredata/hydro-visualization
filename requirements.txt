@@ -5,13 +5,13 @@ pandas
 sklearn
 scikit-learn
 git+https://github.com/xgfs/msid.git
-boto3==1.10.40
+boto3==1.12.34
 Pillow
 umap-learn
 loguru
 flask_cors
 pymongo==3.10.1
-s3fs==0.4.0
+s3fs==0.4.2
 joblib
 hydro-serving-grpc==2.2.1
 requests==2.22.0
@@ -19,4 +19,6 @@ PyYAML
 pyarrow
 tqdm
 jsonschema==3.2.0
-celery==4.4.1
+hydrosdk
+celery[mongodb]==4.4.0rc3
+

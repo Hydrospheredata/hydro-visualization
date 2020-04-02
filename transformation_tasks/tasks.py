@@ -100,6 +100,7 @@ def transform_task(self, method, request_json):
                                                              transformer,
                                                              vis_metrics=vis_metrics)
     plottable_data.update(requests_data_dict)
+    plottable_data["parameters"] = parameters
 
     if training_df is not None and 'embedding' not in training_df.columns:
         training_df['embedding'] = training_embeddings.tolist()

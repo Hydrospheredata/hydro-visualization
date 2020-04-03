@@ -26,7 +26,7 @@ MONGO_PASS = os.getenv("MONGO_PASS")
 
 Whole API description is available [here](openapi.yaml)
 
-1.**POST** /plottable_embeddings/<method>
+1.**POST** /visualization/plottable_embeddings/<method>
 
     
     transformer - manifold learning transformer from ["umap", "trimap", "tsne"]. For now only ["umap"].
@@ -50,7 +50,7 @@ Whole API description is available [here](openapi.yaml)
 {"task_id":  "22e86484-7d90-49fd-a3e1-329b978ee18c"}
 ```
 
-2. **POST** /jobs/<method>
+2. **POST** /visualization/jobs/<method>
 
     request_json:
 ```json
@@ -68,7 +68,7 @@ Whole API description is available [here](openapi.yaml)
 ```json
 {"task_id":  "22e86484-7d90-49fd-a3e1-329b978ee18c"}
 ```
-3. **GET** /jobs?task_id=22e86484-7d90-49fd-a3e1-329b978ee18c
+3. **GET** /visualization/jobs?task_id=22e86484-7d90-49fd-a3e1-329b978ee18c
 
 Returns state of a task and result if ready
 
@@ -117,7 +117,7 @@ states: = ['PENDING', 'RECEIVED', 'STARTED', 'FAILURE', 'REVOKED',  'RETRY'] (So
 }
 ```
 
-2. **POST** /params/<method>
+2. **POST** /visualization/params/<method>
   
     **request format**:
     ```json
@@ -146,7 +146,7 @@ states: = ['PENDING', 'RECEIVED', 'STARTED', 'FAILURE', 'REVOKED',  'RETRY'] (So
 2. upload demo/adult/model and demo/adult/monitoring_model
 2. send request 
 
-POST /plottable_embeddings/umap
+POST /visualization/plottable_embeddings/umap
 
 ```json
 {        "model_name": "adult_scalar",

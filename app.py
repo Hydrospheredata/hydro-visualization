@@ -29,9 +29,10 @@ if SECURE:
 else:
     hs_client = HydroServingClient(SERVING_URL)
 hs_cluster = cluster.Cluster.connect(CLUSTER_URL)
-mongo_client = get_mongo_client(MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB)
 
+mongo_client = get_mongo_client(MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB)
 db = mongo_client['visualization']
+
 s3manager = S3Manager()
 
 app = Flask(__name__)
@@ -42,6 +43,7 @@ if MONGO_USER is not None and MONGO_PASS is not None:
     connection_string = f"mongodb://{MONGO_USER}:{MONGO_PASS}@{MONGO_URL}:{MONGO_PORT}"
 app.config['CELERY_BROKER_URL'] = f"{connection_string}/celery_broker?authSource={MONGO_AUTH_DB}"
 app.config['CELERY_RESULT_BACKEND'] = f"{connection_string}/celery_backend?authSource={MONGO_AUTH_DB}"
+
 
 def make_celery(app):
     celery = Celery(
@@ -63,18 +65,16 @@ def make_celery(app):
 celery = make_celery(app)
 
 celery.autodiscover_tasks(["transformation_tasks"], force=True)
-# celery.conf.update(app.config)
-# celery.conf.update({"CELERY_DISABLE_RATE_LIMITS": True})
 
 import transformation_tasks
 
 
-@app.route("/", methods=['GET'])
+@app.route("/visualization/health", methods=['GET'])
 def hello():
     return "Hi! I am Visualization service"
 
 
-@app.route("/buildinfo", methods=['GET'])
+@app.route("/visualization/buildinfo", methods=['GET'])
 def buildinfo():
     return jsonify(BUILDINFO)
 

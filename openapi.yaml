@@ -1,0 +1,325 @@
+openapi: 3.0.1
+info:
+  title: Hydro-vis
+  description: AAAA
+  termsOfService: kek
+  contact:
+    email: apiteam@swagger.io
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  version: 0.1.0
+externalDocs:
+  description: Find out more about Swagger
+  url: http://swagger.io
+servers:
+- url: https://localhost/
+- url: http://localhost/
+tags:
+- name: Embeddings
+  description: embeddings
+  externalDocs:
+    description: Find out more
+    url: http://google.com
+paths:
+  /plottable_embeddings/{method}:
+    post:
+      tags:
+      - Embeddings
+      summary: creates task to transform data
+      parameters:
+      - name: method
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Transformer name from ["umap", "trimap","tsne"]. For now only ["umap"].
+      description: transformer - manifold learning transformer from ["umap", "trimap",
+        "tsne"]. For now only ["umap"].
+      operationId: transform
+      requestBody:
+        description: Embedding parameters
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmbeddingRequest'
+        required: true
+      responses:
+        200:
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskResponse'
+        400:
+          description: Wrong request body or method name
+          content: {}
+        405:
+          description: Invalid input
+          content: {}
+        404:
+          description: Model not found
+          content: {}
+        500:
+          description: Couldn't create model/servable
+          content: {}
+  /jobs:
+    post:
+      tags:
+      - Jobs
+      summary: Send request to refit embedding model on new data
+      parameters:
+      - name: method
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Transformer name from ["umap", "trimap","tsne"]. For now only ["umap"].
+
+      - name: refit_transformer
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: true
+      description: Starts job on inferencing new data or refitting transformer model.
+      responses:
+        200:
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskResponse'
+    get:
+      tags:
+      - Jobs
+      summary: Get result of fitting transformer from requests jobs/{method} and plottable_embeddings/{method}
+      parameters:
+      - name: task_id
+        in: query
+        required: true
+        schema:
+          type: string
+      responses:
+        200:
+          description: succesfully retreived information about task
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskResult'
+
+
+  /params/{method}:
+    post:
+      tags:
+      - params
+      summary: Submit new configuration
+      parameters:
+      - name: method
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Transformer name from ["umap", "trimap","tsne"]. For now only ["umap"].
+      description: Submit new configuration
+      operationId: set_params
+      requestBody:
+        description: |
+          parameters: dict of transfomer parameters. Different set of parameters for different transformer used.
+          use_labels: true if use ground truth labels from training data. Predicted labels from production data is not used because this will generate false map.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModelParameters'
+        required: true
+      responses:
+        200:
+          description: success
+          content: {}
+
+components:
+  schemas:
+    ModelParameters:
+      type: object
+      properties:
+        model_name:
+          type: string
+        model_version:
+          type: number
+        parameters:
+          type: object
+          properties: {}
+        use_labels:
+          type: boolean
+    VisualizationMetrics:
+      type: string
+      enum:
+      - global_score
+      - sammon_error
+      - auc_score
+      - stability_score
+      - msid
+      - clustering
+    DataBucket:
+      type: object
+      properties:
+        bucket:
+          type: string
+        requests_files:
+          type: string
+        profile_file:
+          type: string
+    EmbeddingRequest:
+      type: object
+      properties:
+        model_name:
+          type: string
+        model_version:
+          type: integer
+          format: int64
+        data:
+          $ref: '#/components/schemas/DataBucket'
+        visualization_metrics:
+          type: array
+          items:
+            $ref: '#/components/schemas/VisualizationMetrics'
+    TaskResponse:
+      type: object
+      properties:
+        task_id:
+          type: string
+      required:
+        - task_id
+
+    EmbeddingResult:
+      type: object
+      properties:
+        data_shape:
+          type: array
+          items:
+            type: integer
+        data:
+          type: array
+          items:
+            type: object
+        request_ids:
+          type: array
+          items:
+            type: integer
+        class_labels:
+          type: object
+          properties:
+            confidences:
+              type: array
+              items:
+                type: number
+            predicted:
+              type: array
+              items:
+                type: integer
+        metrics:
+          type: object
+          properties:
+            anomality:
+              type: object
+              properties:
+                scores:
+                  type: array
+                  items:
+                    type: number
+                threshold:
+                  type: number
+                operation:
+                  type: string
+        top_100:
+          type: array
+          items:
+            type: object
+        visualization_metrics:
+          type: object
+          properties:
+            global_score:
+              type: number
+            sammon_error:
+              type: number
+            auc_score:
+              type: number
+            stability_score:
+              type: number
+            msid:
+              type: number
+            clustering:
+              type: number
+
+    TaskResult:
+      type: object
+      properties:
+        result:
+          type: object
+          properties:
+            data_shape:
+              type: array
+              items:
+                type: integer
+            data:
+              type: array
+              items:
+                type: object
+            request_ids:
+              type: array
+              items:
+                type: integer
+            class_labels:
+              type: object
+              properties:
+                confidences:
+                  type: array
+                  items:
+                    type: number
+                predicted:
+                  type: array
+                  items:
+                    type: integer
+            metrics:
+              type: object
+              properties:
+                anomality:
+                  type: object
+                  properties:
+                    scores:
+                      type: array
+                      items:
+                        type: number
+                    threshold:
+                      type: number
+                    operation:
+                      type: string
+            top_100:
+              type: array
+              items:
+                type: object
+            visualization_metrics:
+              type: object
+              properties:
+                global_score:
+                  type: number
+                sammon_error:
+                  type: number
+                auc_score:
+                  type: number
+                stability_score:
+                  type: number
+                msid:
+                  type: number
+                clustering:
+                  type: number
+        state:
+          type: string
+        task_id:
+          type: string
+        description:
+          type: string
+      required:
+      - state
+      - task_id
+

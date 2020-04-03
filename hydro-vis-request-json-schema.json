@@ -1,0 +1,92 @@
+{
+  "definitions": {},
+  "$schema": "",
+  "$id": "http://example.com/root.json",
+  "type": "object",
+  "title": "",
+  "default": null,
+  "required": [
+    "model_name",
+    "model_version",
+    "data"
+  ],
+  "properties": {
+    "model_name": {
+      "$id": "#/properties/model_name",
+      "type": "string",
+      "title": "The Model_name Schema",
+      "examples": [
+        "adult_scalar"
+      ],
+      "minLength": 1,
+      "pattern": "^(.*)$"
+    },
+    "model_version": {
+      "$id": "#/properties/model_version",
+      "type": "integer",
+      "title": "The Model_version Schema",
+      "examples": [
+        1
+      ]
+    },
+    "data": {
+      "$id": "#/properties/data",
+      "type": "object",
+      "title": "The Data Schema",
+      "required": [
+        "bucket",
+        "production_data_file"
+      ],
+      "properties": {
+        "bucket": {
+          "$id": "#/properties/data/properties/bucket",
+          "type": "string",
+          "title": "The Bucket Schema",
+          "examples": [
+            "hydro-vis"
+          ],
+          "pattern": "^(.*)$"
+        },
+        "production_data_file": {
+          "$id": "#/properties/data/properties/production_data_file",
+          "type": "string",
+          "title": "The Production_data_file Schema",
+          "examples": [
+            "adult/requests.parquet"
+          ],
+          "pattern": "^(.*)$"
+        },
+        "profile_data_file": {
+          "$id": "#/properties/data/properties/profile_data_file",
+          "type": "string",
+          "title": "The Profile_data_file Schema",
+          "examples": [
+            "adult/training.parquet"
+          ],
+          "pattern": "^(.*)$"
+        }
+      }
+    },
+    "visualization_metrics": {
+      "$id": "#/properties/visualization_metrics",
+      "type": "array",
+      "title": "The Visualization_metrics Schema",
+      "default": null,
+      "items": {
+        "$id": "#/properties/visualization_metrics/items",
+        "type": "string",
+        "title": "The Items Schema",
+        "default": "[]",
+        "examples": [
+          "global_score",
+          "sammon_error",
+          "auc_score",
+          "stability_score",
+          "msid",
+          "clustering"
+        ],
+        "pattern": "^(.*)$"
+      }
+    }
+  }
+}

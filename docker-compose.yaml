@@ -1,0 +1,40 @@
+version: '3.5'
+
+services:
+
+
+  hydrovis-worker:
+    build: .
+    environment:
+      - MONGO_URL=mongodb
+      - SERVING_URL=
+      - CLUSTER_URL=
+      - SECURE=True
+      - AWS_ACCESS_KEY_ID=
+      - AWS_SECRET_ACCESS_KEY=
+    command: celery -A app.celery worker
+    depends_on:
+      - hydrovis
+      - mongodb
+
+  hydrovis:
+    build: .
+    environment:
+      - MONGO_URL=mongodb
+      - SERVING_URL=
+      - CLUSTER_URL=
+      - SECURE=True
+      - AWS_ACCESS_KEY_ID=
+      - AWS_SECRET_ACCESS_KEY=
+    command: python app.py
+    ports:
+      - "5000:5000"
+    depends_on:
+      - mongodb
+
+  mongodb:
+    image: mongo:3.0.2
+    container_name: mongodb
+    ports:
+      - "27017:27017"
+

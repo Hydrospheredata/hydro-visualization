@@ -27,6 +27,7 @@ MONGO_PASS = os.getenv("MONGO_PASS")
 Whole API description is available [here](openapi.yaml)
 
 1.**POST** /plottable_embeddings/<method>
+
     
     transformer - manifold learning transformer from ["umap", "trimap", "tsne"]. For now only ["umap"].
   
@@ -190,23 +191,3 @@ parquet
 
 label, confidence, transformed_embedding(vec), score1, score1_thresh, score2, score2_thresh, …
  
-### Time usage
-
-- receive embeddings 5s
-- transform embeddigns 2-4s
-- find 100 neighbours 5s
-
-Total request handling: 12-17s
-
-### Visualize steps
-1. Get embeddings from model/db, get saved transformer
-    1. if there is none, create embeddings using model and default transformer
-2. Compare parameters with existing saved transformer
-    3. if differ fit new transformer
-    4. if no transformer existed before: create new
-3. If new requests are available, add them and refit transformer.
-4. Send embeddings, labels, confidence, top_100 neighbours
-
-
-
-TODO add time management

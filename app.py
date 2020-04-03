@@ -36,6 +36,7 @@ db = mongo_client['visualization']
 s3manager = S3Manager()
 
 app = Flask(__name__)
+app.config["APPLICATION_ROOT"] = 'visualization'
 CORS(app)
 
 connection_string = f"mongodb://{MONGO_URL}:{MONGO_PORT}"
@@ -69,17 +70,17 @@ celery.autodiscover_tasks(["transformation_tasks"], force=True)
 import transformation_tasks
 
 
-@app.route("/visualization/health", methods=['GET'])
+@app.route("/health", methods=['GET'])
 def hello():
     return "Hi! I am Visualization service"
 
 
-@app.route("/visualization/buildinfo", methods=['GET'])
+@app.route("/buildinfo", methods=['GET'])
 def buildinfo():
     return jsonify(BUILDINFO)
 
 
-@app.route('/visualization/plottable_embeddings/<method>', methods=['POST'])
+@app.route('/plottable_embeddings/<method>', methods=['POST'])
 def transform(method: str):
     """
     transforms model training and requests embedding data to lower space for visualization (100D to 2D)
@@ -105,7 +106,7 @@ def transform(method: str):
         'Task_id': result.task_id}), 202
 
 
-@app.route('/visualization/jobs/<method>', methods=['POST'])
+@app.route('/jobs/<method>', methods=['POST'])
 def refit_model(method):
     """
     Starts refitting transformer model
@@ -134,7 +135,7 @@ def refit_model(method):
         'task_id': result.task_id}), 202
 
 
-@app.route('/visualization/params/<method>', methods=['POST'])
+@app.route('/params/<method>', methods=['POST'])
 def set_params(method):
     """
     Write transformer parameters for given model in database
@@ -157,7 +158,7 @@ def set_params(method):
     return jsonify({}), 200
 
 
-@app.route('/visualization/jobs', methods=['GET'])
+@app.route('/jobs', methods=['GET'])
 def model_status():
     """
     Sends model status

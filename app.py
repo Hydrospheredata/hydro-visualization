@@ -79,7 +79,7 @@ def buildinfo():
     return jsonify(BUILDINFO)
 
 
-@app.route('/visualization//plottable_embeddings/<method>', methods=['POST'])
+@app.route('/visualization/plottable_embeddings/<method>', methods=['POST'])
 def transform(method: str):
     """
     transforms model training and requests embedding data to lower space for visualization (100D to 2D)

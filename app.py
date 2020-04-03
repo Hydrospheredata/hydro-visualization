@@ -79,7 +79,7 @@ def buildinfo():
     return jsonify(BUILDINFO)
 
 
-@app.route('/plottable_embeddings/<method>', methods=['POST'])
+@app.route('/visualization//plottable_embeddings/<method>', methods=['POST'])
 def transform(method: str):
     """
     transforms model training and requests embedding data to lower space for visualization (100D to 2D)
@@ -105,7 +105,7 @@ def transform(method: str):
         'Task_id': result.task_id}), 202
 
 
-@app.route('/jobs/<method>', methods=['POST'])
+@app.route('/visualization/jobs/<method>', methods=['POST'])
 def refit_model(method):
     """
     Starts refitting transformer model
@@ -134,7 +134,7 @@ def refit_model(method):
         'task_id': result.task_id}), 202
 
 
-@app.route('/params/<method>', methods=['POST'])
+@app.route('/visualization/params/<method>', methods=['POST'])
 def set_params(method):
     """
     Write transformer parameters for given model in database
@@ -157,7 +157,7 @@ def set_params(method):
     return jsonify({}), 200
 
 
-@app.route('/jobs', methods=['GET'])
+@app.route('/visualization/jobs', methods=['GET'])
 def model_status():
     """
     Sends model status

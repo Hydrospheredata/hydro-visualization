@@ -12,4 +12,3 @@ WORKDIR /app
 EXPOSE 5000
 
 COPY . .
-CMD ["echo", "$aws_access_key_id"]

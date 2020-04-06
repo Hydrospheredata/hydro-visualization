@@ -10,8 +10,9 @@ services:
       - SERVING_URL=
       - CLUSTER_URL=
       - SECURE=True
-      - AWS_ACCESS_KEY_ID=
-      - AWS_SECRET_ACCESS_KEY=
+      - AWS_ACCESS_KEY_ID=minio
+      - AWS_SECRET_ACCESS_KEY=minio123
+      - AWS_STORAGE_ENDPOINT=http://minio:9000
     command: celery -A app.celery worker
     depends_on:
       - hydrovis

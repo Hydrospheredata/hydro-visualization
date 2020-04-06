@@ -1,4 +1,5 @@
 import json
+import os
 import tempfile
 from typing import Dict, Optional, List, Tuple
 
@@ -25,7 +26,16 @@ def get_mongo_client(mongo_url, mongo_port, mongo_user, mongo_pass, mongo_auth_d
 
 class S3Manager:
     def __init__(self):
-        self.fs = s3fs.S3FileSystem()
+        storage_endpoint = os.getenv('AWS_STORAGE_ENDPOINT')
+        if storage_endpoint:
+            self.fs = s3fs.S3FileSystem(
+                anon=False,
+                client_kwargs={
+                    'endpoint_url': storage_endpoint
+                }
+            )
+        else:
+            self.fs = s3fs.S3FileSystem()
 
     def read_parquet(self, bucket_name, filename) -> Optional[pd.DataFrame]:
         if not bucket_name or not filename:

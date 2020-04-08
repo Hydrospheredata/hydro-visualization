@@ -1,6 +1,7 @@
 import json
 import sys
 
+import git
 import grpc
 from celery import Celery
 from flask import Flask, request, jsonify
@@ -17,9 +18,17 @@ from data_management import S3Manager, update_record, \
 from data_management import get_record
 from ml_transformers.utils import AVAILABLE_TRANSFORMERS
 
-with open("version.json") as version_file:
-    BUILDINFO = json.load(version_file)  # Load buildinfo with branchName, headCommitId and version label
-    BUILDINFO['pythonVersion'] = sys.version  # Augment with python runtime version
+with open("version") as f:
+    VERSION = f.read().strip()
+    repo = git.Repo(".")
+    cur_branch = repo.active_branch
+    cur_commit = cur_branch.commit
+    BUILDINFO = {
+        "version": VERSION,
+        "gitHeadCommit": cur_commit,
+        "gitCurrentBranch": cur_branch,
+        "pythonVersion": sys.version
+    }
 
 with open('./hydro-vis-request-json-schema.json') as f:
     REQUEST_JSON_SCHEMA = json.load(f)

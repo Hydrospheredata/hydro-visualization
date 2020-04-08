@@ -21,12 +21,10 @@ from ml_transformers.utils import AVAILABLE_TRANSFORMERS
 with open("version") as f:
     VERSION = f.read().strip()
     repo = git.Repo(".")
-    cur_branch = repo.active_branch
-    cur_commit = cur_branch.commit
     BUILDINFO = {
         "version": VERSION,
-        "gitHeadCommit": cur_commit,
-        "gitCurrentBranch": cur_branch,
+        "gitHeadCommit": repo.active_branch.commit.hexsha,
+        "gitCurrentBranch": repo.active_branch.name,
         "pythonVersion": sys.version
     }
 

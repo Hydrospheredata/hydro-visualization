@@ -24,10 +24,12 @@ with open("version.json") as version_file:
 with open('./hydro-vis-request-json-schema.json') as f:
     REQUEST_JSON_SCHEMA = json.load(f)
     validator = Draft7Validator(REQUEST_JSON_SCHEMA)
+
 if SECURE:
     hs_client = HydroServingClient(SERVING_URL, credentials=grpc.ssl_channel_credentials())
 else:
     hs_client = HydroServingClient(SERVING_URL)
+
 hs_cluster = cluster.Cluster.connect(CLUSTER_URL)
 
 mongo_client = get_mongo_client(MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB)

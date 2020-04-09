@@ -9,6 +9,8 @@ from flask_cors import CORS
 from hydrosdk import cluster
 from jsonschema import Draft7Validator
 from loguru import logger as logging
+from werkzeug.middleware.dispatcher import DispatcherMiddleware
+from werkzeug.serving import run_simple
 
 from client import HydroServingClient, HydroServingModel
 from conf import SERVING_URL, MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, DEBUG_ENV, \
@@ -45,7 +47,8 @@ db = mongo_client['visualization']
 s3manager = S3Manager()
 
 app = Flask(__name__)
-app.config["APPLICATION_ROOT"] = 'visualization'
+app.config["APPLICATION_ROOT"] = '/visualization'
+app.wsgi_app = DispatcherMiddleware(run_simple, {'/visualization': app.wsgi_app})
 CORS(app)
 
 connection_string = f"mongodb://{MONGO_URL}:{MONGO_PORT}"
@@ -75,6 +78,7 @@ def make_celery(app):
 celery = make_celery(app)
 
 celery.autodiscover_tasks(["transformation_tasks"], force=True)
+celery.conf.update({"CELERY_DISABLE_RATE_LIMITS": True})
 
 import transformation_tasks
 

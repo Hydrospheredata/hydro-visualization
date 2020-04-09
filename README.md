@@ -35,10 +35,6 @@ Whole API description is available [here](openapi.yaml)
 ```json
 {        "model_name": "adult_scalar",
          "model_version": 1,
-         "data": { "bucket": "hydro-vis",
-                   "requests_file": "adult/requests.parquet",
-                   "profile_file": "adult/training.parquet"
-                   },
          "visualization_metrics": ["global_score", "sammon_error", "auc_score", "stability_score", "msid", "clustering"]
 }
  
@@ -56,10 +52,6 @@ Whole API description is available [here](openapi.yaml)
 ```json
 {        "model_name": "adult_scalar",
          "model_version": 1,
-         "data": { "bucket": "hydro-vis",
-                   "requests_file": "adult/requests.parquet",
-                   "profile_file": "adult/training.parquet"
-                   },
          "visualization_metrics": ["global_score", "sammon_error", "auc_score", "stability_score", "msid", "clustering"]
 }
 ```
@@ -150,11 +142,7 @@ POST /visualization/plottable_embeddings/umap
 
 ```json
 {        "model_name": "adult_scalar",
-         "model_version": 1,
-         "data": { "bucket": "hydro-vis",
-                   "production_data_file": "adult/requests.parquet",
-                   "profile_data_file": "adult/training.parquet"
-                   },
+         "model_version": 7,
          "visualization_metrics": ["global_score", "sammon_error", "auc_score", "stability_score", "msid", "clustering"]
 }
  
@@ -172,9 +160,8 @@ collection: umap, trimap, tsne
 {
 "model_name": "adult_scalar",
 "model_version": "1",
-"embeddings_bucket_name": "hydro-vis",
-"result_file": "result.json",
-"transformer_file": "umap_transformer",
+"result_file": "s3://hydro-vis/adult_scalar/2/result.json",
+"transformer_file": "s3://hydro-vis/adult_scalar/2/umap_transformer",
 "parameters": {"n_neighbours": 15,
                   "min_dist": 0.1,
                   "metric":  "cosine"},

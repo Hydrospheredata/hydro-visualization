@@ -1,8 +1,10 @@
 import json
-import os
+import math
+import random
 import tempfile
 from typing import Dict, Optional, List, Tuple
 
+import fastparquet
 import joblib
 import numpy as np
 import pandas as pd
@@ -14,6 +16,7 @@ from pymongo import MongoClient
 from tqdm import tqdm
 
 from client import HydroServingServable
+from conf import AWS_STORAGE_ENDPOINT, FEATURE_LAKE_BUCKET, BATCH_SIZE
 from ml_transformers.transformer import Transformer
 from ml_transformers.utils import DEFAULT_PARAMETERS, Coloring, get_top_100_neighbours
 
@@ -26,12 +29,11 @@ def get_mongo_client(mongo_url, mongo_port, mongo_user, mongo_pass, mongo_auth_d
 
 class S3Manager:
     def __init__(self):
-        storage_endpoint = os.getenv('AWS_STORAGE_ENDPOINT')
-        if storage_endpoint:
+        if AWS_STORAGE_ENDPOINT:
             self.fs = s3fs.S3FileSystem(
                 anon=False,
                 client_kwargs={
-                    'endpoint_url': storage_endpoint
+                    'endpoint_url': AWS_STORAGE_ENDPOINT
                 }
             )
         else:
@@ -53,11 +55,11 @@ class S3Manager:
         except Exception as e:
             logging.error(f'Couldn\'t write {filename} to {bucket_name} bucket. Error: {e}')
 
-    def write_json(self, data: Dict, bucket_name: str, filename: str):
-        with self.fs.open(f's3://{bucket_name}/{filename}', 'w') as f:
+    def write_json(self, data: Dict, filepath:str):
+        with self.fs.open(filepath, 'w') as f:
             f.write(json.dumps(data))
 
-    def read_json(self, bucket_name: str, filename: str) -> Dict:
+    def read_json(self, filepath:str) -> Dict:
         '''
         Reads json
         If file not found or couldn't parse content, return empty Dict and log error
@@ -65,19 +67,20 @@ class S3Manager:
         :param filename:
         :return: file content or {} in case of error
         '''
-        if not self.fs.exists(f's3://{bucket_name}/{filename}'):
-            logging.error(f'No such file {bucket_name}/{filename}')
+        if not self.fs.exists(filepath):
+            logging.error(f'No such file {filepath}')
             return {}
-        with self.fs.open(f'{bucket_name}/{filename}', 'rb') as f:
+        clean_path = filepath.replace('s3://', '')
+        with self.fs.open(clean_path, 'rb') as f:
             content = f.read()
         try:
             js_object = json.loads(content)
         except Exception as e:
-            logging.error(f'Couldn\'t read {bucket_name}:{filename} file as json file. Error: {e}')
+            logging.error(f'Couldn\'t read {filepath} file as json file. Error: {e}')
             return {}
         return js_object
 
-    def write_transformer_model(self, transformer, bucket_name, filename) -> bool:
+    def write_transformer_model(self, transformer, filepath) -> bool:
         """
 
         :param transformer:
@@ -89,14 +92,14 @@ class S3Manager:
             try:
                 joblib.dump(transformer, fp)
             except Exception as e:
-                logging.error(f'Couldn\'t dump joblib file: {bucket_name}/{filename}. Error: {e}')
+                logging.error(f'Couldn\'t dump joblib file: {filepath}. Error: {e}')
                 return False
             fp.seek(0)
             try:
-                with self.fs.open(f's3://{bucket_name}/{filename}', 'wb') as s3file:
+                with self.fs.open(filepath, 'wb') as s3file:
                     s3file.write(fp.read())
             except Exception as e:
-                logging.error(f'Couldn\'t write joblib file: {bucket_name}/{filename}. Error: {e}')
+                logging.error(f'Couldn\'t write joblib file: {filepath}. Error: {e}')
                 return False
         return True
 
@@ -124,6 +127,42 @@ class S3Manager:
                 return None
             return transformer
 
+    def get_production_subsample(self, model: Model, size: int, undersampling = False) -> pd.DataFrame:
+        """
+        Return a random subsample of request-response pairs from an S3 feature lake.
+
+
+        :param undersampling: If True, returns subsample of size = min(available samples, size),
+        if False and number of samples stored in feature lake < size then raise an Exception
+        :param size: Number of requests\response pairs in subsample
+        :type batch_size: Number of requests stored in each parquet file
+        """
+
+        number_of_parquets_needed = math.ceil(size / BATCH_SIZE)
+
+        model_feature_store_path = f"s3://{FEATURE_LAKE_BUCKET}/{model.name}/{model.version}"
+
+        parquets_paths = self.fs.find(model_feature_store_path)
+
+        if len(parquets_paths) < number_of_parquets_needed:
+            if not undersampling:
+                raise ValueError(
+                    f"This model doesn't have {size} requests in feature lake.\n"
+                    f"Right now there are {len(parquets_paths) * BATCH_SIZE} requests stored.")
+            else:
+                number_of_parquets_needed = len(parquets_paths)
+
+        selected_batch_paths = random.sample(parquets_paths, number_of_parquets_needed)
+
+        dataset = fastparquet.ParquetFile(selected_batch_paths, open_with=self.fs.open)
+
+        df: pd.DataFrame = dataset.to_pandas()
+
+        if df.shape[0] > size:
+            return df.sample(n=size)
+        else:
+            return df
+
 
 def parse_requests_dataframe(df, monitoring_fields: List[Tuple[str, str]], embeddings: np.ndarray) -> Dict:
     """
@@ -141,7 +180,7 @@ def parse_requests_dataframe(df, monitoring_fields: List[Tuple[str, str]], embed
         coloring_info = {}
         if np.issubdtype(column, np.integer):
             coloring = Coloring.CLASS
-            coloring_info['classes'] = np.unique(df['class']).tolist()
+            coloring_info['classes'] = np.unique(column).tolist()
         elif np.issubdtype(column, np.floating):
             coloring = Coloring.GRADIENT
         else:
@@ -149,7 +188,7 @@ def parse_requests_dataframe(df, monitoring_fields: List[Tuple[str, str]], embed
         coloring_info['coloring_type'] = coloring.value
         return coloring_info
 
-    requests_ids = df['request_id'].values.tolist()
+    requests_ids = df['_id'].values.tolist()
 
     top_100_neighbours = get_top_100_neighbours(embeddings)
     counterfactuals = [[] for _ in range(len(top_100_neighbours))]
@@ -170,15 +209,15 @@ def parse_requests_dataframe(df, monitoring_fields: List[Tuple[str, str]], embed
     class_info = {'class': predictions, 'confidence': confidence}
 
     monitoring_data = {}
-    for (monitoring_metric_name, comparison_operator) in monitoring_fields:
-        if monitoring_metric_name in df.columns:
-            scores = np.array(df[monitoring_metric_name])
-            thresholds = np.array(df[f'{monitoring_metric_name}_threshold'])
-
-            monitoring_data[monitoring_metric_name] = {'scores': scores.tolist(), 'threshold': thresholds[0],
-                                                       # taking last threshold
-                                                       'operation': comparison_operator}
-            monitoring_data[monitoring_metric_name].update(get_coloring_info(df[monitoring_metric_name]))
+    # for (monitoring_metric_name, comparison_operator) in monitoring_fields:
+    #     if monitoring_metric_name in df.columns:
+    #         scores = np.array(df[monitoring_metric_name])
+    #         thresholds = np.array(df[f'{monitoring_metric_name}_threshold'])
+    #
+    #         monitoring_data[monitoring_metric_name] = {'scores': scores.tolist(), 'threshold': thresholds[0],
+    #                                                    # taking last threshold
+    #                                                    'operation': comparison_operator}
+    #         monitoring_data[monitoring_metric_name].update(get_coloring_info(df[monitoring_metric_name]))
 
     return {'class_labels': class_info,
             'metrics': monitoring_data,
@@ -198,7 +237,6 @@ def get_record(db, method, model_name, model_version) -> Dict:
     if not existing_record:
         return {"model_name": model_name,
                 "model_version": model_version,
-                "embeddings_bucket_name": "",
                 "result_file": "",
                 "transformer_file": "",
                 "parameters": DEFAULT_PARAMETERS[method],

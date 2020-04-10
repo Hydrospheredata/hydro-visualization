@@ -12,7 +12,7 @@ from loguru import logger as logging
 
 from client import HydroServingClient, HydroServingModel
 from conf import SERVING_URL, MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, DEBUG_ENV, \
-    CLUSTER_URL, SECURE
+    CLUSTER_URL, SECURE, APP_PORT
 from data_management import S3Manager, update_record, \
     get_mongo_client
 from data_management import get_record
@@ -210,4 +210,4 @@ def valid_embedding_model(model: HydroServingModel) -> [bool]:
 
 
 if __name__ == "__main__":
-    app.run(debug=DEBUG_ENV, host='0.0.0.0', port=5000)
+    app.run(debug=DEBUG_ENV, host='0.0.0.0', port=APP_PORT)

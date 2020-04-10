@@ -9,8 +9,6 @@ from flask_cors import CORS
 from hydrosdk import cluster
 from jsonschema import Draft7Validator
 from loguru import logger as logging
-from werkzeug.middleware.dispatcher import DispatcherMiddleware
-from werkzeug.serving import run_simple
 
 from client import HydroServingClient, HydroServingModel
 from conf import SERVING_URL, MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, DEBUG_ENV, \
@@ -47,8 +45,7 @@ db = mongo_client['visualization']
 s3manager = S3Manager()
 
 app = Flask(__name__)
-app.config["APPLICATION_ROOT"] = '/visualization'
-app.wsgi_app = DispatcherMiddleware(run_simple, {'/visualization': app.wsgi_app})
+PREFIX = '/visualization'
 CORS(app)
 
 connection_string = f"mongodb://{MONGO_URL}:{MONGO_PORT}"
@@ -83,17 +80,17 @@ celery.conf.update({"CELERY_DISABLE_RATE_LIMITS": True})
 import transformation_tasks
 
 
-@app.route("/health", methods=['GET'])
+@app.route(PREFIX + "/health", methods=['GET'])
 def hello():
     return "Hi! I am Visualization service"
 
 
-@app.route("/buildinfo", methods=['GET'])
+@app.route(PREFIX + "/buildinfo", methods=['GET'])
 def buildinfo():
     return jsonify(BUILDINFO)
 
 
-@app.route('/plottable_embeddings/<method>', methods=['POST'])
+@app.route(PREFIX + '/plottable_embeddings/<method>', methods=['POST'])
 def transform(method: str):
     """
     transforms model training and requests embedding data to lower space for visualization (100D to 2D)
@@ -119,7 +116,7 @@ def transform(method: str):
         'Task_id': result.task_id}), 202
 
 
-@app.route('/jobs/<method>', methods=['POST'])
+@app.route(PREFIX + '/jobs/<method>', methods=['POST'])
 def refit_model(method):
     """
     Starts refitting transformer model
@@ -148,7 +145,7 @@ def refit_model(method):
         'task_id': result.task_id}), 202
 
 
-@app.route('/params/<method>', methods=['POST'])
+@app.route(PREFIX + '/params/<method>', methods=['POST'])
 def set_params(method):
     """
     Write transformer parameters for given model in database
@@ -171,7 +168,7 @@ def set_params(method):
     return jsonify({}), 200
 
 
-@app.route('/jobs', methods=['GET'])
+@app.route(PREFIX + '/jobs', methods=['GET'])
 def model_status():
     """
     Sends model status

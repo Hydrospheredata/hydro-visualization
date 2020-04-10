@@ -120,7 +120,6 @@ def transform(method: str):
 def refit_model(method):
     """
     Starts refitting transformer model
-    TODO change to model_id request
     :params model_id: model id int
     :return: job_id
     """

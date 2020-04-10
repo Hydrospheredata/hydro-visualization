@@ -8,10 +8,10 @@ from hydrosdk.model import Model
 from hydrosdk.monitoring import MetricSpec
 from loguru import logger as logging
 
-from app import celery, s3manager, hs_cluster
+from app import celery, s3manager, hs_cluster, hs_client
 from conf import MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, CLUSTER_URL, HYDRO_VIS_BUCKET_NAME
 from data_management import get_record, parse_embeddings_from_dataframe, parse_requests_dataframe, \
-    update_record, get_mongo_client
+    update_record, get_mongo_client, compute_training_embeddings
 from visualizer import transform_high_dimensional
 
 
@@ -107,18 +107,16 @@ def transform_task(self, method, request_json):
     elif 'embedding' in training_df.columns:
         logging.debug('Training embeddings exist')
         training_embeddings = np.stack(training_df['embedding'].values)
-    else:
-        training_embeddings = None
-    # else:  # infer embeddings using model
-        # try:
-        #     servable = hs_client.deploy_servable(model_name, int(model_version))  # TODO SDK
-        # except ValueError as e:
-        #     return {"message": f"Unable to find {model_name}v{model_version}. Error: {e}"}, 404
-        # except Exception as e:
-        #     return {"message": f"Error {model_name}v{model_version}. Error: {e}"}, 500
-        #
-        # training_embeddings = compute_training_embeddings(model, servable, training_df)
-        # servable.delete()
+    else:  # infer embeddings using model
+        try:
+            servable = hs_client.deploy_servable(model_name, int(model_version))  # TODO SDK
+        except ValueError as e:
+            return {"message": f"Unable to find {model_name}v{model_version}. Error: {e}"}, 404
+        except Exception as e:
+            return {"message": f"Error {model_name}v{model_version}. Error: {e}"}, 500
+
+        training_embeddings = compute_training_embeddings(model, servable, training_df)
+        servable.delete()
 
     plottable_data, transformer = transform_high_dimensional(method, parameters,
                                                              training_embeddings, production_embeddings,

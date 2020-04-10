@@ -10,7 +10,7 @@
 
 ```json
 {        "model_name": "adult_scalar_test",
-         "model_version": 3,
+         "model_version": 7,
          "visualization_metrics": ["global_score", "sammon_error", "auc_score", "stability_score", "msid", "clustering"]
 }
 ```
@@ -19,8 +19,9 @@
     request_json:
 ```json
 {        "model_name": "adult_scalar_test",
-         "model_version": 3,
+         "model_version": 7,
          "visualization_metrics": ["global_score", "sammon_error", "auc_score", "stability_score", "msid", "clustering"]
 }
 ```
-3. **GET** /visualization/jobs?task_id=22e86484-7d90-49fd-a3e1-329b978ee18c
+3. **GET** /visualization/jobs?task_id={TASK_ID}
+

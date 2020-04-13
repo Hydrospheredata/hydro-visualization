@@ -1,3 +1,4 @@
 .ipynb_checkpoints
-.dockerignore
-demo
+test
+.idea
+venv

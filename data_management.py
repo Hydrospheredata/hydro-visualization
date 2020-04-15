@@ -16,7 +16,7 @@ from tqdm import tqdm
 from client import HydroServingServable
 from conf import AWS_STORAGE_ENDPOINT, CLUSTER_URL
 from ml_transformers.transformer import Transformer
-from ml_transformers.utils import DEFAULT_PARAMETERS, Coloring, get_top_100_neighbours
+from ml_transformers.utils import DEFAULT_PARAMETERS, Coloring, get_top_N_neighbours
 
 
 def get_mongo_client(mongo_url, mongo_port, mongo_user, mongo_pass, mongo_auth_db):
@@ -151,16 +151,16 @@ def parse_requests_dataframe(df, monitoring_fields: List[Tuple[str, str]], embed
 
     requests_ids = df['_hs_request_id'].values.tolist()
 
-    top_100_neighbours = get_top_100_neighbours(embeddings)
-    counterfactuals = [[] for _ in range(len(top_100_neighbours))]
+    top_N_neighbours = get_top_N_neighbours(embeddings, N=50)
+    counterfactuals = [[] for _ in range(len(top_N_neighbours))]
     predictions, confidence = [], []
     if 'class' in df.columns:
         predictions = {'data': df['class'].values.tolist()}
         predictions.update(get_coloring_info(df['class']))
         class_labels = df['class'].values.tolist()
         counterfactuals = list(
-            map(lambda i: list(filter(lambda x: class_labels[x] != class_labels[i], top_100_neighbours[i])),
-                range(len(top_100_neighbours))))
+            map(lambda i: list(filter(lambda x: class_labels[x] != class_labels[i], top_N_neighbours[i])),
+                range(len(top_N_neighbours))))
         del class_labels
 
     if 'confidence' in df.columns:
@@ -189,7 +189,7 @@ def parse_requests_dataframe(df, monitoring_fields: List[Tuple[str, str]], embed
     return {'class_labels': class_info,
             'metrics': monitoring_data,
             'requests_ids': requests_ids,
-            'top_100': top_100_neighbours,
+            'top_N': top_N_neighbours,
             'counterfactuals': counterfactuals}
 
 

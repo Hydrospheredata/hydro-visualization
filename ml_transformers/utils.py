@@ -23,7 +23,7 @@ class Coloring(Enum):
     NONE = 'none'
 
 
-def get_top_100_neighbours(X) -> List[List[int]]:
+def get_top_N_neighbours(X, N=50) -> List[List[int]]:
     """
     Finds top 100 closest neighbours for each point
     :param X: list of points in high dimensional space
@@ -33,7 +33,7 @@ def get_top_100_neighbours(X) -> List[List[int]]:
     tree = cKDTree(X)
     top_100 = []
     for i in range(len(X)):
-        _, top = tree.query(X[i], k=101)
+        _, top = tree.query(X[i], k=N+1)
         top = np.delete(top, np.where(top == i))
         top_100.append(top.tolist())
     logging.info(f'TOP 100 neighbour calculation took: {datetime.now() - start}')

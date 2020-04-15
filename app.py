@@ -1,6 +1,7 @@
 import json
 import sys
 
+import git
 import grpc
 from celery import Celery
 from flask import Flask, request, jsonify
@@ -11,15 +12,21 @@ from loguru import logger as logging
 
 from client import HydroServingClient, HydroServingModel
 from conf import SERVING_URL, MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, DEBUG_ENV, \
-    CLUSTER_URL, SECURE
+    CLUSTER_URL, SECURE, APP_PORT
 from data_management import S3Manager, update_record, \
     get_mongo_client
 from data_management import get_record
 from ml_transformers.utils import AVAILABLE_TRANSFORMERS
 
-with open("version.json") as version_file:
-    BUILDINFO = json.load(version_file)  # Load buildinfo with branchName, headCommitId and version label
-    BUILDINFO['pythonVersion'] = sys.version  # Augment with python runtime version
+with open("version") as f:
+    VERSION = f.read().strip()
+    repo = git.Repo(".")
+    BUILDINFO = {
+        "version": VERSION,
+        "gitHeadCommit": repo.active_branch.commit.hexsha,
+        "gitCurrentBranch": repo.active_branch.name,
+        "pythonVersion": sys.version
+    }
 
 with open('./hydro-vis-request-json-schema.json') as f:
     REQUEST_JSON_SCHEMA = json.load(f)
@@ -30,7 +37,7 @@ if SECURE:
 else:
     hs_client = HydroServingClient(SERVING_URL)
 
-hs_cluster = cluster.Cluster.connect(CLUSTER_URL)
+hs_cluster = cluster.Cluster(CLUSTER_URL)  # fix the initialization deadlock (managerui <-> visualization)
 
 mongo_client = get_mongo_client(MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB)
 db = mongo_client['visualization']
@@ -38,7 +45,7 @@ db = mongo_client['visualization']
 s3manager = S3Manager()
 
 app = Flask(__name__)
-app.config["APPLICATION_ROOT"] = 'visualization'
+PREFIX = '/visualization'
 CORS(app)
 
 connection_string = f"mongodb://{MONGO_URL}:{MONGO_PORT}"
@@ -68,21 +75,22 @@ def make_celery(app):
 celery = make_celery(app)
 
 celery.autodiscover_tasks(["transformation_tasks"], force=True)
+celery.conf.update({"CELERY_DISABLE_RATE_LIMITS": True})
 
 import transformation_tasks
 
 
-@app.route("/health", methods=['GET'])
+@app.route(PREFIX + "/health", methods=['GET'])
 def hello():
     return "Hi! I am Visualization service"
 
 
-@app.route("/buildinfo", methods=['GET'])
+@app.route(PREFIX + "/buildinfo", methods=['GET'])
 def buildinfo():
     return jsonify(BUILDINFO)
 
 
-@app.route('/plottable_embeddings/<method>', methods=['POST'])
+@app.route(PREFIX + '/plottable_embeddings/<method>', methods=['POST'])
 def transform(method: str):
     """
     transforms model training and requests embedding data to lower space for visualization (100D to 2D)
@@ -108,11 +116,10 @@ def transform(method: str):
         'Task_id': result.task_id}), 202
 
 
-@app.route('/jobs/<method>', methods=['POST'])
+@app.route(PREFIX + '/jobs/<method>', methods=['POST'])
 def refit_model(method):
     """
     Starts refitting transformer model
-    TODO change to model_id request
     :params model_id: model id int
     :return: job_id
     """
@@ -137,7 +144,7 @@ def refit_model(method):
         'task_id': result.task_id}), 202
 
 
-@app.route('/params/<method>', methods=['POST'])
+@app.route(PREFIX + '/params/<method>', methods=['POST'])
 def set_params(method):
     """
     Write transformer parameters for given model in database
@@ -160,7 +167,7 @@ def set_params(method):
     return jsonify({}), 200
 
 
-@app.route('/jobs', methods=['GET'])
+@app.route(PREFIX + '/jobs', methods=['GET'])
 def model_status():
     """
     Sends model status
@@ -202,4 +209,4 @@ def valid_embedding_model(model: HydroServingModel) -> [bool]:
 
 
 if __name__ == "__main__":
-    app.run(debug=DEBUG_ENV, host='0.0.0.0', port=5000)
+    app.run(debug=DEBUG_ENV, host='0.0.0.0', port=APP_PORT)

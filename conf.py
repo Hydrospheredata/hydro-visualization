@@ -1,6 +1,6 @@
 import os
 DEBUG_ENV = bool(os.getenv("DEBUG_ENV", True))
-
+APP_PORT = int(os.getenv("APP_PORT", 5000))
 SERVING_URL = os.getenv("SERVING_URL", "managerui:9090")
 CLUSTER_URL = os.getenv("CLUSTER_URL", "http://localhost")
 SECURE = os.getenv("SECURE", False)

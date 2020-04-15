@@ -7,8 +7,7 @@
   "default": null,
   "required": [
     "model_name",
-    "model_version",
-    "data"
+    "model_version"
   ],
   "properties": {
     "model_name": {
@@ -28,44 +27,6 @@
       "examples": [
         1
       ]
-    },
-    "data": {
-      "$id": "#/properties/data",
-      "type": "object",
-      "title": "The Data Schema",
-      "required": [
-        "bucket",
-        "production_data_file"
-      ],
-      "properties": {
-        "bucket": {
-          "$id": "#/properties/data/properties/bucket",
-          "type": "string",
-          "title": "The Bucket Schema",
-          "examples": [
-            "hydro-vis"
-          ],
-          "pattern": "^(.*)$"
-        },
-        "production_data_file": {
-          "$id": "#/properties/data/properties/production_data_file",
-          "type": "string",
-          "title": "The Production_data_file Schema",
-          "examples": [
-            "adult/requests.parquet"
-          ],
-          "pattern": "^(.*)$"
-        },
-        "profile_data_file": {
-          "$id": "#/properties/data/properties/profile_data_file",
-          "type": "string",
-          "title": "The Profile_data_file Schema",
-          "examples": [
-            "adult/training.parquet"
-          ],
-          "pattern": "^(.*)$"
-        }
-      }
     },
     "visualization_metrics": {
       "$id": "#/properties/visualization_metrics",

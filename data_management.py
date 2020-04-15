@@ -2,7 +2,6 @@ import json
 import tempfile
 from typing import Dict, Optional, List, Tuple
 
-import eventlet
 import joblib
 import numpy as np
 import pandas as pd
@@ -246,8 +245,7 @@ def compute_training_embeddings(model: Model, servable: HydroServingServable,
 
 
 def get_production_subsample(model_id, size=1000) -> pd.DataFrame:
-    with eventlet.Timeout(200):
-        r = requests.get(f'{CLUSTER_URL}/monitoring/checks/subsample/{model_id}?size={size}')
+    r = requests.get(f'{CLUSTER_URL}/monitoring/checks/subsample/{model_id}?size={size}')
     if r.status_code != 200:
         return pd.DataFrame()
     return pd.DataFrame.from_dict(r.json())

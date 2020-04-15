@@ -160,15 +160,6 @@ components:
       - stability_score
       - msid
       - clustering
-    DataBucket:
-      type: object
-      properties:
-        bucket:
-          type: string
-        requests_files:
-          type: string
-        profile_file:
-          type: string
     EmbeddingRequest:
       type: object
       properties:
@@ -177,8 +168,6 @@ components:
         model_version:
           type: integer
           format: int64
-        data:
-          $ref: '#/components/schemas/DataBucket'
         visualization_metrics:
           type: array
           items:
@@ -190,7 +179,6 @@ components:
           type: string
       required:
         - task_id
-
     EmbeddingResult:
       type: object
       properties:
@@ -210,13 +198,40 @@ components:
           type: object
           properties:
             confidences:
-              type: array
-              items:
-                type: number
-            predicted:
-              type: array
-              items:
-                type: integer
+              type: object
+              properties:
+                classes:
+                  type: array
+                  items:
+                    type: number
+                coloring_type:
+                  type: string
+                data:
+                  type: array
+                  items:
+                    type: number
+              required:
+                - coloring_type
+                - data
+            class:
+              type: object
+              properties:
+                classes:
+                  type: array
+                  items:
+                    type: number
+                coloring_type:
+                  type: string
+                data:
+                  type: array
+                  items:
+                    type: number
+              required:
+                - coloring_type
+                - data
+        parameters:
+          type: object
+          properties: {}
         metrics:
           type: object
           properties:
@@ -232,6 +247,10 @@ components:
                 operation:
                   type: string
         top_100:
+          type: array
+          items:
+            type: object
+        counterfactuals:
           type: array
           items:
             type: object
@@ -256,63 +275,7 @@ components:
       properties:
         result:
           type: object
-          properties:
-            data_shape:
-              type: array
-              items:
-                type: integer
-            data:
-              type: array
-              items:
-                type: object
-            request_ids:
-              type: array
-              items:
-                type: integer
-            class_labels:
-              type: object
-              properties:
-                confidences:
-                  type: array
-                  items:
-                    type: number
-                predicted:
-                  type: array
-                  items:
-                    type: integer
-            metrics:
-              type: object
-              properties:
-                anomality:
-                  type: object
-                  properties:
-                    scores:
-                      type: array
-                      items:
-                        type: number
-                    threshold:
-                      type: number
-                    operation:
-                      type: string
-            top_100:
-              type: array
-              items:
-                type: object
-            visualization_metrics:
-              type: object
-              properties:
-                global_score:
-                  type: number
-                sammon_error:
-                  type: number
-                auc_score:
-                  type: number
-                stability_score:
-                  type: number
-                msid:
-                  type: number
-                clustering:
-                  type: number
+          $ref: '#/components/schemas/EmbeddingResult'
         state:
           type: string
         task_id:

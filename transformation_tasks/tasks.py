@@ -8,10 +8,10 @@ from hydrosdk.model import Model
 from hydrosdk.monitoring import MetricSpec
 from loguru import logger as logging
 
-from app import celery, s3manager, hs_cluster
+from app import celery, s3manager, hs_cluster, hs_client
 from conf import MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, CLUSTER_URL, HYDRO_VIS_BUCKET_NAME
 from data_management import get_record, parse_embeddings_from_dataframe, parse_requests_dataframe, \
-    update_record, get_mongo_client
+    update_record, get_mongo_client, compute_training_embeddings, get_production_subsample
 from visualizer import transform_high_dimensional
 
 
@@ -88,7 +88,7 @@ def transform_task(self, method, request_json):
         training_df = pd.read_csv(path_to_training_data)
     else:
         training_df = None
-    production_requests_df = s3manager.get_production_subsample(model, 1000)
+    production_requests_df = get_production_subsample(model.id, 1000)
 
     if production_requests_df.empty:
         return f'Production data is empty', 404
@@ -96,7 +96,7 @@ def transform_task(self, method, request_json):
         return "Unable to get requests embeddings", 404
 
     production_embeddings = parse_embeddings_from_dataframe(production_requests_df)
-    monitoring_models_conf = [(metric.name, metric.config.threshold_op) for metric in
+    monitoring_models_conf = [(metric.name, metric.config.threshold_op, metric.config.threshold) for metric in
                               MetricSpec.list_for_model(hs_cluster, model.id)]
     requests_data_dict = parse_requests_dataframe(production_requests_df, monitoring_models_conf, production_embeddings)
 
@@ -107,18 +107,16 @@ def transform_task(self, method, request_json):
     elif 'embedding' in training_df.columns:
         logging.debug('Training embeddings exist')
         training_embeddings = np.stack(training_df['embedding'].values)
-    else:
-        training_embeddings = None
-    # else:  # infer embeddings using model
-        # try:
-        #     servable = hs_client.deploy_servable(model_name, int(model_version))  # TODO SDK
-        # except ValueError as e:
-        #     return {"message": f"Unable to find {model_name}v{model_version}. Error: {e}"}, 404
-        # except Exception as e:
-        #     return {"message": f"Error {model_name}v{model_version}. Error: {e}"}, 500
-        #
-        # training_embeddings = compute_training_embeddings(model, servable, training_df)
-        # servable.delete()
+    else:  # infer embeddings using model
+        try:
+            servable = hs_client.deploy_servable(model_name, int(model_version))  # TODO SDK
+        except ValueError as e:
+            return {"message": f"Unable to find {model_name}v{model_version}. Error: {e}"}, 404
+        except Exception as e:
+            return {"message": f"Error {model_name}v{model_version}. Error: {e}"}, 500
+
+        training_embeddings = compute_training_embeddings(model, servable, training_df)
+        servable.delete()
 
     plottable_data, transformer = transform_high_dimensional(method, parameters,
                                                              training_embeddings, production_embeddings,
@@ -126,10 +124,6 @@ def transform_task(self, method, request_json):
                                                              vis_metrics=vis_metrics)
     plottable_data.update(requests_data_dict)
     plottable_data["parameters"] = parameters
-
-    # if training_df is not None and 'embedding' not in training_df.columns: # TODO
-    #     training_df['embedding'] = training_embeddings.tolist()
-    #     s3manager.write_parquet(training_df, bucket_name, path_to_training_data)
 
     result_path = s3_model_path + '/result.json'
     s3manager.write_json(data=plottable_data, filepath=result_path)

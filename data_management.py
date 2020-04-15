@@ -1,14 +1,13 @@
 import json
-import math
-import random
 import tempfile
 from typing import Dict, Optional, List, Tuple
 
-import fastparquet
+import eventlet
 import joblib
 import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq
+import requests
 import s3fs
 from hydrosdk.model import Model
 from loguru import logger as logging
@@ -16,7 +15,7 @@ from pymongo import MongoClient
 from tqdm import tqdm
 
 from client import HydroServingServable
-from conf import AWS_STORAGE_ENDPOINT, FEATURE_LAKE_BUCKET, BATCH_SIZE
+from conf import AWS_STORAGE_ENDPOINT, CLUSTER_URL
 from ml_transformers.transformer import Transformer
 from ml_transformers.utils import DEFAULT_PARAMETERS, Coloring, get_top_100_neighbours
 
@@ -55,11 +54,11 @@ class S3Manager:
         except Exception as e:
             logging.error(f'Couldn\'t write {filename} to {bucket_name} bucket. Error: {e}')
 
-    def write_json(self, data: Dict, filepath:str):
+    def write_json(self, data: Dict, filepath: str):
         with self.fs.open(filepath, 'w') as f:
             f.write(json.dumps(data))
 
-    def read_json(self, filepath:str) -> Dict:
+    def read_json(self, filepath: str) -> Dict:
         '''
         Reads json
         If file not found or couldn't parse content, return empty Dict and log error
@@ -127,43 +126,6 @@ class S3Manager:
                 return None
             return transformer
 
-    def get_production_subsample(self, model: Model, size: int, undersampling = False) -> pd.DataFrame:
-        """
-        Return a random subsample of request-response pairs from an S3 feature lake.
-
-
-        :param undersampling: If True, returns subsample of size = min(available samples, size),
-        if False and number of samples stored in feature lake < size then raise an Exception
-        :param size: Number of requests\response pairs in subsample
-        :type batch_size: Number of requests stored in each parquet file
-        """
-
-        number_of_parquets_needed = math.ceil(size / BATCH_SIZE)
-
-        model_feature_store_path = f"s3://{FEATURE_LAKE_BUCKET}/{model.name}/{model.version}"
-
-        parquets_paths = self.fs.find(model_feature_store_path)
-
-        if len(parquets_paths) < number_of_parquets_needed:
-            if not undersampling:
-                raise ValueError(
-                    f"This model doesn't have {size} requests in feature lake.\n"
-                    f"Right now there are {len(parquets_paths) * BATCH_SIZE} requests stored.")
-            else:
-                number_of_parquets_needed = len(parquets_paths)
-
-        selected_batch_paths = random.sample(parquets_paths, number_of_parquets_needed)
-
-        dataset = fastparquet.ParquetFile(selected_batch_paths, open_with=self.fs.open)
-
-        df: pd.DataFrame = dataset.to_pandas()
-
-        if df.shape[0] > size:
-            return df.sample(n=size)
-        else:
-            return df
-
-
 def parse_requests_dataframe(df, monitoring_fields: List[Tuple[str, str]], embeddings: np.ndarray) -> Dict:
     """
     Extracts:
@@ -188,7 +150,7 @@ def parse_requests_dataframe(df, monitoring_fields: List[Tuple[str, str]], embed
         coloring_info['coloring_type'] = coloring.value
         return coloring_info
 
-    requests_ids = df['_id'].values.tolist()
+    requests_ids = df['_hs_request_id'].values.tolist()
 
     top_100_neighbours = get_top_100_neighbours(embeddings)
     counterfactuals = [[] for _ in range(len(top_100_neighbours))]
@@ -209,15 +171,21 @@ def parse_requests_dataframe(df, monitoring_fields: List[Tuple[str, str]], embed
     class_info = {'class': predictions, 'confidence': confidence}
 
     monitoring_data = {}
-    # for (monitoring_metric_name, comparison_operator) in monitoring_fields:
-    #     if monitoring_metric_name in df.columns:
-    #         scores = np.array(df[monitoring_metric_name])
-    #         thresholds = np.array(df[f'{monitoring_metric_name}_threshold'])
-    #
-    #         monitoring_data[monitoring_metric_name] = {'scores': scores.tolist(), 'threshold': thresholds[0],
-    #                                                    # taking last threshold
-    #                                                    'operation': comparison_operator}
-    #         monitoring_data[monitoring_metric_name].update(get_coloring_info(df[monitoring_metric_name]))
+    metric_checks = df._hs_metric_checks.to_list()
+    for (monitoring_metric_name, comparison_operator, threshold) in monitoring_fields:
+        monitoring_data[monitoring_metric_name] = {'scores': [], 'threshold': threshold,
+                                                   'operation': comparison_operator}
+
+    for request in metric_checks:
+        for (monitoring_metric_name, comparison_operator, threshold) in monitoring_fields:
+            metric_dict = request.get(monitoring_metric_name, {})
+            metric_data = monitoring_data[monitoring_metric_name]
+            metric_data['scores'].append(metric_dict.get('value', None))
+            monitoring_data[monitoring_metric_name] = metric_data
+
+    for (monitoring_metric_name, comparison_operator, threshold) in monitoring_fields:
+        monitoring_data[monitoring_metric_name].update(
+            get_coloring_info(pd.Series(monitoring_data[monitoring_metric_name]['scores'])))
 
     return {'class_labels': class_info,
             'metrics': monitoring_data,
@@ -275,3 +243,11 @@ def compute_training_embeddings(model: Model, servable: HydroServingServable,
         embeddings.append(outputs['embedding'])
 
     return np.concatenate(embeddings)
+
+
+def get_production_subsample(model_id, size=1000) -> pd.DataFrame:
+    with eventlet.Timeout(200):
+        r = requests.get(f'{CLUSTER_URL}/monitoring/checks/subsample/{model_id}?size={size}')
+    if r.status_code != 200:
+        return pd.DataFrame()
+    return pd.DataFrame.from_dict(r.json())

@@ -102,7 +102,7 @@ def transform(method: str):
 
     logging.info(f'Received request: {request_json}')
 
-    result = transformation_tasks.tasks.transform_task.delay(method, request_json)
+    result = transformation_tasks.tasks.transform_task.apply_async(args=(method, request_json), queue="visualisation")
 
     return jsonify({
         'Task_id': result.task_id}), 202
@@ -132,7 +132,7 @@ def refit_model(method):
     if refit_transformer:
         db_model_info['transformer_file'] = ''
     update_record(db, method, db_model_info, model_name, model_version)
-    result = transformation_tasks.tasks.transform_task.delay(method, request_json)
+    result = transformation_tasks.tasks.transform_task.apply_async(args=(method, request_json), queue="visualisation")
     return jsonify({
         'task_id': result.task_id}), 202
 

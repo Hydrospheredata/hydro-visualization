@@ -26,7 +26,7 @@ def pack_value_into_request(val):
     hours_tensor = hs.TensorProto(dtype=hs.DT_INT64, int64_val=[val[10]], tensor_shape=hs.TensorShapeProto())
     country_tensor = hs.TensorProto(dtype=hs.DT_INT64, int64_val=[val[11]], tensor_shape=hs.TensorShapeProto())
 
-    model_spec = hs.ModelSpec(name="adult_scalar")
+    model_spec = hs.ModelSpec(name="adult_test")
 
     # Pack tensors into a request
     request = hs.PredictRequest(model_spec=model_spec, inputs={"age": age_tensor,

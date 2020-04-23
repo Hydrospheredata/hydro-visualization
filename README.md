@@ -14,6 +14,12 @@ MONGO_PORT = int(os.getenv("MONGO_PORT", 27017))
 MONGO_AUTH_DB = os.getenv("MONGO_AUTH_DB", "admin")
 MONGO_USER = os.getenv("MONGO_USER")
 MONGO_PASS = os.getenv("MONGO_PASS")
+AWS_ACCESS_KEY_ID=os.getenv("AWS_ACCESS_KEY_ID")
+AWS_SECRET_ACCESS_KEY=os.getenv("AWS_SECRET_ACCESS_KEY")
+AWS_STORAGE_ENDPOINT = os.getenv('AWS_STORAGE_ENDPOINT', '')
+FEATURE_LAKE_BUCKET = os.getenv('FEATURE_LAKE_BUCKET', 'feature-lake')
+HYDRO_VIS_BUCKET_NAME = os.getenv('BUCKET_NAME', 'hydro-vis')
+HYDRO_VIS_TASK_QUEUE = os.getenv('HYDRO_VIS_TASK_QUEUE', 'service.hydro-vis')
 ```
 
 ## Assumptions:

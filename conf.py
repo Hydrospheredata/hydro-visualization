@@ -12,4 +12,4 @@ MONGO_PASS = os.getenv("MONGO_PASS")
 AWS_STORAGE_ENDPOINT = os.getenv('AWS_STORAGE_ENDPOINT', '')
 FEATURE_LAKE_BUCKET = os.getenv('FEATURE_LAKE_BUCKET', 'feature-lake')
 HYDRO_VIS_BUCKET_NAME = os.getenv('BUCKET_NAME', 'hydro-vis')
-BATCH_SIZE = 10
+HYDRO_VIS_TASK_QUEUE = os.getenv('HYDRO_VIS_TASK_QUEUE', 'service.hydro-vis')

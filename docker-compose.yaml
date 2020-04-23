@@ -13,7 +13,8 @@ services:
       - AWS_ACCESS_KEY_ID=minio
       - AWS_SECRET_ACCESS_KEY=minio123
       - AWS_STORAGE_ENDPOINT=http://minio:9000
-    command: celery -A app.celery worker
+      - HYDRO_VIS_TASK_QUEUE=service.hydro-vis
+    command: celery -A app.celery worker -l info -Q $HYDRO_VIS_TASK_QUEUE
     depends_on:
       - hydrovis
       - mongodb
@@ -28,6 +29,7 @@ services:
       - AWS_ACCESS_KEY_ID=minio
       - AWS_SECRET_ACCESS_KEY=minio123
       - AWS_STORAGE_ENDPOINT=http://minio:9000
+      - HYDRO_VIS_TASK_QUEUE=service.hydro-vis
 
     command: python app.py
     ports:

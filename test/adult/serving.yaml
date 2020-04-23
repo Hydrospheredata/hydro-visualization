@@ -83,7 +83,6 @@ payload:
   - "model/classification_model.joblib"
 runtime: "hydrosphere/serving-runtime-python-3.6:0.1.2-rc0"
 install-command: "pip install -r requirements.txt"
-training-data: data/profile.csv
 contract:
   name: "predict"
   inputs:

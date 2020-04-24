@@ -186,8 +186,7 @@ def model_status():
     elif task.state == 'SUCCESS':
         # job completed, return result
         result = task.get()
-
-        response['result'] = result
+        response.update(result)
     else:
         # something went wrong in the background job, return the exception raised
         response['description'] = task.info

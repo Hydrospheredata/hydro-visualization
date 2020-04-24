@@ -13,7 +13,7 @@ services:
       - AWS_ACCESS_KEY_ID=minio
       - AWS_SECRET_ACCESS_KEY=minio123
       - AWS_STORAGE_ENDPOINT=http://minio:9000
-    command: celery -A app.celery worker
+    command: celery -A app.celery worker -Q visualization
     depends_on:
       - hydrovis
       - mongodb

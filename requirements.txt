@@ -22,4 +22,3 @@ jsonschema==3.2.0
 hydrosdk
 celery[mongodb]==4.4.0rc3
 gitpython~=2.1
-fastparquet~=0.3.3

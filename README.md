@@ -32,7 +32,7 @@ Whole API description is available [here](openapi.yaml)
 1.**POST** /visualization/plottable_embeddings/<method>
 
     
-    transformer - manifold learning transformer from ["umap", "trimap", "tsne"]. For now only ["umap"].
+    method - manifold learning transformer from ["umap", "trimap", "tsne"]. For now only ["umap"].
   
    request json:   
 ```json

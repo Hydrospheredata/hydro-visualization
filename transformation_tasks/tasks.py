@@ -17,9 +17,9 @@ from visualizer import transform_high_dimensional
 
 def valid_embedding_model(model: Model) -> [bool]:
     """
-    Check if model returns embeddings
-    :param model:
-    :return:
+    Check if model returns embedding field
+    :param model: Hydrosphere Model object to check
+    :return: True if model has embedding output
     """
     output_names = [field.name for field in model.contract.predict.outputs]
     if 'embedding' not in output_names:
@@ -29,9 +29,9 @@ def valid_embedding_model(model: Model) -> [bool]:
 
 def get_training_data_path(model: Model) -> str:
     """
-
-    :param model:
-    :return:
+    Requests for training data path on s3
+    :param model: Hydrosphere Model object
+    :return: path to S3 file or empty string if there is no training data
     """
     response = requests.get(f'{CLUSTER_URL}/monitoring/training_data?modelVersionId={model.id}')
     training_data_s3 = json.loads(response.text)
@@ -42,6 +42,12 @@ def get_training_data_path(model: Model) -> str:
 
 
 def get_production_data_sample(model_id, sample_size=1000) -> pd.DataFrame:
+    """
+    Requests for subsample of production requests
+    :param model_id: ID of a modelVersion
+    :param sample_size: size of sample
+    :return: pandas Dataframe
+    """
     response = requests.get(f'{CLUSTER_URL}/monitoring/checks/subsample/{model_id}?size={sample_size}')
     return pd.DataFrame.from_dict(response.json())
 

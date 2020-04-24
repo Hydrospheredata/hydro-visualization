@@ -1,5 +1,5 @@
 # hydro-vis
-Service for visualisation of high dimensional for hydrosphere
+Service for visualization of high dimensional for hydrosphere
 
 ## DEPENDENCIES
 

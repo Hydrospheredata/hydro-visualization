@@ -1,17 +1,16 @@
 import json
 from datetime import datetime
 
-import numpy as np
 import pandas as pd
 import requests
 from hydrosdk.model import Model
 from hydrosdk.monitoring import MetricSpec
 from loguru import logger as logging
 
-from app import celery, s3manager, hs_cluster, hs_client
+from app import celery, s3manager, hs_cluster
 from conf import MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, CLUSTER_URL, HYDRO_VIS_BUCKET_NAME
 from data_management import get_record, parse_embeddings_from_dataframe, parse_requests_dataframe, \
-    update_record, get_mongo_client, compute_training_embeddings, get_production_subsample
+    update_record, get_mongo_client, get_production_subsample
 from visualizer import transform_high_dimensional
 
 
@@ -85,7 +84,8 @@ def transform_task(self, method, request_json):
 
     # Parsing model requests and training data
     if path_to_training_data:
-        training_df = pd.read_csv(path_to_training_data)
+        training_df = pd.read_csv(s3manager.fs.open(path_to_training_data,
+                                                    mode='rb'))
     else:
         training_df = None
     production_requests_df = get_production_subsample(model.id, 99)
@@ -101,22 +101,28 @@ def transform_task(self, method, request_json):
     requests_data_dict = parse_requests_dataframe(production_requests_df, monitoring_models_conf, production_embeddings)
 
     logging.info(f'Parsed requests data shape: {production_embeddings.shape}')
+    training_embeddings = None
 
-    if training_df is None:
-        training_embeddings = None
-    elif 'embedding' in training_df.columns:
-        logging.debug('Training embeddings exist')
-        training_embeddings = np.stack(training_df['embedding'].values)
-    else:  # infer embeddings using model
-        try:
-            servable = hs_client.deploy_servable(model_name, int(model_version))  # TODO SDK
-        except ValueError as e:
-            return {"message": f"Unable to find {model_name}v{model_version}. Error: {e}"}, 404
-        except Exception as e:
-            return {"message": f"Error {model_name}v{model_version}. Error: {e}"}, 500
-
-        training_embeddings = compute_training_embeddings(model, servable, training_df)
-        servable.delete()
+    # TODO SDK
+    # if training_df is None:
+    #     training_embeddings = None
+    # elif 'embedding' in training_df.columns:
+    #     logging.debug('Training embeddings exist')
+    #     training_embeddings = np.stack(training_df['embedding'].values)
+    # else:  # infer embeddings using model
+    #     try:
+    #         servable = hs_client.deploy_servable(model_name, int(model_version))
+    #     except ValueError as e:
+    #         return {"message": f"Unable to find {model_name}v{model_version}. Error: {e}"}, 404
+    #     except Exception as e:
+    #         return {"message": f"Error {model_name}v{model_version}. Error: {e}"}, 500
+    #     except:
+    #         e = sys.exc_info()[0]
+    #         logging.error(f'Couldn\'t get model predictions: {e}')
+    #         training_embeddings = None
+    #     else:
+    #         training_embeddings = compute_training_embeddings(model, servable, training_df)
+    #         servable.delete()
 
     plottable_data, transformer = transform_high_dimensional(method, parameters,
                                                              training_embeddings, production_embeddings,

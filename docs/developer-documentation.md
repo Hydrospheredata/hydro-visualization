@@ -20,7 +20,7 @@ HYDRO_VIS_BUCKET_NAME = os.getenv('BUCKET_NAME', 'hydro-vis')
 
 
 # API
-Whole API description is available [here](openapi.yaml).
+Whole API description is available [here](../openapi.yaml).
 
 ## Request for transformed embeddings of a model to plot
 
@@ -179,7 +179,7 @@ Visualization jobs are Celery tasks that you can invoke or get results from.
  
   ## API Demo
 1. set environment variables: AWS_ACCESS_KEY, AWS_SECRET_KEY
-2. Upload testing [adult model](test/adult) `hs apply -f serving.yaml` and send request using simulate traffic [script](test/adult/demo/simulate_traffic.py)
+2. Upload testing [adult model](../test/adult) `hs apply -f serving.yaml` and send request using simulate traffic [script](../test/adult/demo/simulate_traffic.py)
 3. Send request on plottable embeddings:
 
 POST /visualization/plottable_embeddings/umap

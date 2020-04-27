@@ -89,7 +89,7 @@ Visualization jobs are Celery tasks that you can invoke or get results from.
 
     **method**  - name of method to use for visualization. For now only *umap*
 
-    **refit_tr
+    **refit_transformer** - if True, then transformer is refitted on new data. Otherwise, new data is inferenced using old data manifold. Default False
 - **Data Params**
 
     ```json
@@ -202,8 +202,8 @@ POST /visualization/plottable_embeddings/umap
 Transformation consists of three main stages: 
 
 1. Collecting model embeddings from training and production data
-2. Collecting request labels for coloring
-3. Transforming collected embeddings from N dimension to 2 dimensions
+2. Transforming collected embeddings from N dimension to 2 dimensions
+3. Caching results
 
 ## Collecting model embeddings
 
@@ -216,11 +216,11 @@ First, service requests path to training data:
 ```
 GET {CLUSTER_URL}/monitoring/training_data?modelVersionId={model.id}
 ```
-Method: **[get_training_data_path](../transformation_tasks/tasks.py)**
+**Method: [get_training_data_path](../transformation_tasks/tasks.py)**
 
 However, training data usually contains only model inputs and labels, it does not have any model embeddings. To produce such embeddings we create a shadowless servable of a model and send training data as separate requests.
 We do this in order to not litter unwanted requests in model monitoring. 
-Method: **def [compute_training_embeddings](../data_management.py)**
+**Method: [compute_training_embeddings](../data_management.py)**
 
 > If model has no training data, we ignore this step and set `training_embeddings` to `None`. This data is not required, but it is recommended to have it for more accurate transformation. 
 
@@ -241,18 +241,94 @@ Secondly, we extract additional information about requests:
 - confidence scores (if model has `confidence` output)
 - monitoring metrics return values, thresholds and comparison operator
 - N nearest neighbours (for each request) in original embedding space
+- N Closest counterfactuals (nearest requests with different labels)
 
-Method: **[parse_requests_dataframe](../data_management.py)**
+**Method: [parse_requests_dataframe](../data_management.py)**
 
 All this additional labeling data is used to color visualization. In UI you can choose how to assign colors to data points:
 For continuous values (ex. confidence score) `gradient` coloring is used.
 
 > In visualization even though monitoring metrics return continuous scores, each score is thresholded using metric threshold and comparison operator. Thus requests will be colored in only two colors.
 
+## Transforming embeddings
+Both training and production embeddings are passed to instance of manifold-learning transformer ([transformer](../ml_transformers/transformer.py)).
+If transformer instance is cached, then we use method transformer.transform, which does not invoke training of transformer.
+If we do not have pretrained saved transformer instance, we use transformer.fit_transform, which trains transformer with all available data.
 
+**Method: [transform_high_dimensional](../visualizer.py)**
+ 
+After transforming, embeddings are evaluated using specific metric that can estimate how good we fitted N-dimensional embeddings in 2-dimensional space.
 
 ## Caching results
+```json
+{
+"model_name": "adult_scalar",
+"model_version": "1",
+"result_file": "s3://hydro-vis/adult_scalar/2/result.json",
+"transformer_file": "s3://hydro-vis/adult_scalar/2/umap_transformer",
+"parameters": {"n_neighbours": 15,
+                  "min_dist": 0.1,
+                  "metric":  "cosine"},
+"use_labels": false
+}
+```
+
+Inferencing embeddings and training transformer is time-consuming. For that we store latest results of transformation and pretrained transformer on S3 bucket `hydro-vis`. 
+Path to these files are stored in mongodb. 
+
+To visualize new requests post a job request:
+
+**POST** /visualization/jobs/<method> 
+
+**Data Params**
+
+    ```json
+    {        "model_name": "adult_scalar",
+             "model_version": 1
+    }
+    ```
+
+
+If a lot of new data came through model we need to refit transformer before inferencing new data. Because inferencing a lot of new data on old transformer will result in inaccurate visualization.
+For this add refit_transformer parameter:
+
+
+**POST** /visualization/jobs/<method>?refit_transformer=true
+
+**Data Params**
+
+    ```json
+    {        "model_name": "adult_scalar",
+             "model_version": 1
+    }
+    ```
+
+### Mongodb
+
+We use mongodb to store parameters of model visualization transformer. For each type of transformer we use separate collection. Structure of db record:
+
+```json
+{
+"model_name": "adult_scalar",
+"model_version": "1",
+"result_file": "s3://hydro-vis/adult_scalar/2/result.json",
+"transformer_file": "s3://hydro-vis/adult_scalar/2/umap_transformer",
+"parameters": {"n_neighbours": 15,
+                  "min_dist": 0.1,
+                  "metric":  "cosine"},
+"use_labels": false
+}
+```
+
 
 # Manifold Learning Transformers
 
+
+## Abstract interface
+## Parametrizing transformers
+
+
 ## Visualization metrics
+
+
+# Refitting

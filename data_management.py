@@ -1,6 +1,8 @@
 import json
+import random
 import sys
 import tempfile
+from time import sleep
 from typing import Dict, Optional, List, Tuple
 
 import boto3
@@ -53,7 +55,7 @@ class S3Manager:
             self.fs = s3fs.S3FileSystem()
             boto_client = boto3.client(
                 's3')
-
+        sleep(random.random())
         if not self.fs.exists(f's3://{HYDRO_VIS_BUCKET_NAME}'):
             logging.info(f'Creating {HYDRO_VIS_BUCKET_NAME} bucket')
             boto_client.create_bucket(Bucket=HYDRO_VIS_BUCKET_NAME)

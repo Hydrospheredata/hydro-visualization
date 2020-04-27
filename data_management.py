@@ -1,7 +1,11 @@
 import json
+import random
+import sys
 import tempfile
+from time import sleep
 from typing import Dict, Optional, List, Tuple
 
+import boto3
 import joblib
 import numpy as np
 import pandas as pd
@@ -14,7 +18,7 @@ from pymongo import MongoClient
 from tqdm import tqdm
 
 from client import HydroServingServable
-from conf import AWS_STORAGE_ENDPOINT, CLUSTER_URL
+from conf import AWS_STORAGE_ENDPOINT, CLUSTER_URL, HYDRO_VIS_BUCKET_NAME
 from ml_transformers.transformer import Transformer
 from ml_transformers.utils import DEFAULT_PARAMETERS, Coloring, get_top_N_neighbours
 
@@ -27,15 +31,38 @@ def get_mongo_client(mongo_url, mongo_port, mongo_user, mongo_pass, mongo_auth_d
 
 class S3Manager:
     def __init__(self):
+
         if AWS_STORAGE_ENDPOINT:
+
             self.fs = s3fs.S3FileSystem(
                 anon=False,
                 client_kwargs={
                     'endpoint_url': AWS_STORAGE_ENDPOINT
-                }
+                },
+                config_kwargs={'s3': {'addressing_style': 'path'}}
             )
+
+            from botocore.client import Config
+            conf = Config(s3={'addressing_style': 'path'})
+
+            boto_client = boto3.client(
+                's3',
+                endpoint_url=AWS_STORAGE_ENDPOINT,
+                config=conf
+            )
+
         else:
             self.fs = s3fs.S3FileSystem()
+            boto_client = boto3.client(
+                's3')
+        sleep(random.random())
+        if not self.fs.exists(f's3://{HYDRO_VIS_BUCKET_NAME}'):
+            logging.info(f'Creating {HYDRO_VIS_BUCKET_NAME} bucket')
+            try:
+                boto_client.create_bucket(Bucket=HYDRO_VIS_BUCKET_NAME)
+            except Exception as e:
+                if not self.fs.exists(f's3://{HYDRO_VIS_BUCKET_NAME}'):
+                    logging.error(f'Couldn\'t create {HYDRO_VIS_BUCKET_NAME} bucket due to error: {e}')
 
     def read_parquet(self, bucket_name, filename) -> Optional[pd.DataFrame]:
         if not bucket_name or not filename:
@@ -124,6 +151,7 @@ class S3Manager:
                 logging.error(f'{bucket_name}/{filename} ({transformer.__class__}) is not Transformer instance. ')
                 return None
             return transformer
+
 
 def parse_requests_dataframe(df, monitoring_fields: List[Tuple[str, str]], embeddings: np.ndarray) -> Dict:
     """
@@ -238,8 +266,13 @@ def compute_training_embeddings(model: Model, servable: HydroServingServable,
     embeddings = []
     logging.debug('Embedding inference: ')
     for i in tqdm(range(len(inputs))):
-        outputs = servable(inputs.iloc[i])
-        embeddings.append(outputs['embedding'])
+        try:  # TODO replace with predictors
+            outputs = servable(inputs.iloc[i])
+            embeddings.append(outputs['embedding'])
+        except:
+            e = sys.exc_info()[0]
+            logging.error(f'Couldn\'t get model predictions: {e}')
+            return None
 
     return np.concatenate(embeddings)
 

@@ -58,7 +58,11 @@ class S3Manager:
         sleep(random.random())
         if not self.fs.exists(f's3://{HYDRO_VIS_BUCKET_NAME}'):
             logging.info(f'Creating {HYDRO_VIS_BUCKET_NAME} bucket')
-            boto_client.create_bucket(Bucket=HYDRO_VIS_BUCKET_NAME)
+            try:
+                boto_client.create_bucket(Bucket=HYDRO_VIS_BUCKET_NAME)
+            except Exception as e:
+                if not self.fs.exists(f's3://{HYDRO_VIS_BUCKET_NAME}'):
+                    logging.error(f'Couldn\'t create {HYDRO_VIS_BUCKET_NAME} bucket due to error: {e}')
 
     def read_parquet(self, bucket_name, filename) -> Optional[pd.DataFrame]:
         if not bucket_name or not filename:

@@ -199,9 +199,60 @@ POST /visualization/plottable_embeddings/umap
 
 
 # Transformation pipeline
+Transformation consists of three main stages: 
 
+1. Collecting model embeddings from training and production data
+2. Collecting request labels for coloring
+3. Transforming collected embeddings from N dimension to 2 dimensions
+
+## Collecting model embeddings
+
+Model has two resources of data: training data (it is uploaded to S3 storage during model upload) and production data - all requests that go through model. 
+[Transformation task](../transformation_tasks/tasks.py) starts with collecting this data. 
+
+### Training data
+First, service requests path to training data:
+
+```
+GET {CLUSTER_URL}/monitoring/training_data?modelVersionId={model.id}
+```
+Method: **[get_training_data_path](../transformation_tasks/tasks.py)**
+
+However, training data usually contains only model inputs and labels, it does not have any model embeddings. To produce such embeddings we create a shadowless servable of a model and send training data as separate requests.
+We do this in order to not litter unwanted requests in model monitoring. 
+Method: **def [compute_training_embeddings](../data_management.py)**
+
+> If model has no training data, we ignore this step and set `training_embeddings` to `None`. This data is not required, but it is recommended to have it for more accurate transformation. 
+
+### Production data
+For visualization we do not use all produciton data, instead we request a subsample of data of size 1000. 
+
+``
+GET {CLUSTER_URL}/monitoring/checks/subsample/{model_id}?size={size}
+``
+
+Production sample is a dataframe that contains not only embeddings but also all request information. Firstly, embeddings are extracted from dataframe. Method **[parse_embeddings_from_dataframe](../data_management.py)**
+
+> If model has no `embedding` field in it's outputs, then we cannpt extract embeddings and visualization task is stopped and return message that model has no `embedding` field. 
+
+Secondly, we extract additional information about requests:
+
+- class labels (if model has `class` in outputs)
+- confidence scores (if model has `confidence` output)
+- monitoring metrics return values, thresholds and comparison operator
+- N nearest neighbours (for each request) in original embedding space
+
+Method: **[parse_requests_dataframe](../data_management.py)**
+
+All this additional labeling data is used to color visualization. In UI you can choose how to assign colors to data points:
+For continuous values (ex. confidence score) `gradient` coloring is used.
+
+> In visualization even though monitoring metrics return continuous scores, each score is thresholded using metric threshold and comparison operator. Thus requests will be colored in only two colors.
+
+
+
+## Caching results
 
 # Manifold Learning Transformers
 
 ## Visualization metrics
-- [Cucumber](#cucumber)

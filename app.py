@@ -37,7 +37,7 @@ if SECURE:
 else:
     hs_client = HydroServingClient(SERVING_URL)
 
-hs_cluster = cluster.Cluster(CLUSTER_URL)  # fix the initialization deadlock (managerui <-> visualization)
+hs_cluster = cluster.Cluster.connect(CLUSTER_URL)
 
 mongo_client = get_mongo_client(MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB)
 db = mongo_client['visualization']

@@ -177,7 +177,7 @@ def parse_requests_dataframe(df, monitoring_fields: List[Tuple[str, str]], embed
         coloring_info['coloring_type'] = coloring.value
         return coloring_info
 
-    requests_ids = df['_hs_request_id'].values.tolist()
+    requests_ids = df['_id'].values.tolist()
 
     top_N_neighbours = get_top_N_neighbours(embeddings, N=50)
     counterfactuals = [[] for _ in range(len(top_N_neighbours))]

@@ -88,7 +88,7 @@ def transform_task(self, method, request_json):
                                                     mode='rb'))
     else:
         training_df = None
-    production_requests_df = get_production_subsample(model.id, 99)
+    production_requests_df = get_production_subsample(model.id, 200)
 
     if production_requests_df.empty:
         return f'Production data is empty', 404

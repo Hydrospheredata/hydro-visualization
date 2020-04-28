@@ -122,7 +122,6 @@ def refit_model(method):
     Starts refitting transformer model
     :params model_id: model id int
     :return: job_id
-
     """
     refit_transformer = request.args.get('refit_transformer', True)
 

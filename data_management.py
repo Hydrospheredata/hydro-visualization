@@ -18,7 +18,7 @@ from pymongo import MongoClient
 from tqdm import tqdm
 
 from client import HydroServingServable
-from conf import AWS_STORAGE_ENDPOINT, CLUSTER_URL, HYDRO_VIS_BUCKET_NAME, AWS_SECRET_ACCESS_KEY, AWS_ACCESS_KEY_ID
+from conf import AWS_STORAGE_ENDPOINT, CLUSTER_URL, HYDRO_VIS_BUCKET_NAME
 from ml_transformers.transformer import Transformer
 from ml_transformers.utils import DEFAULT_PARAMETERS, Coloring, get_top_N_neighbours
 
@@ -35,8 +35,6 @@ class S3Manager:
         if AWS_STORAGE_ENDPOINT:
 
             self.fs = s3fs.S3FileSystem(
-                key=AWS_SECRET_ACCESS_KEY,
-                secret=AWS_ACCESS_KEY_ID,
                 anon=False,
                 client_kwargs={
                     'endpoint_url': AWS_STORAGE_ENDPOINT
@@ -54,7 +52,7 @@ class S3Manager:
             )
 
         else:
-            self.fs = s3fs.S3FileSystem(key=AWS_SECRET_ACCESS_KEY, secret=AWS_ACCESS_KEY_ID)
+            self.fs = s3fs.S3FileSystem()
             boto_client = boto3.client(
                 's3')
         sleep(random.random())

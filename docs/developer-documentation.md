@@ -1,5 +1,13 @@
 # Hysrosphere visualization service
 
+Contents:
+
+[API](#api)
+
+[Transformation pipeline](#transformation-pipeline)
+
+[Manifold Learning Transformers](#manifold-learning-transformers)
+
 # DEPENDENCIES
 
 ```python
@@ -495,9 +503,30 @@ def sammon_error(X: np.ndarray, _X: np.ndarray, distance_metric=lambda x1, x2: n
 - **_X** - poins in transformed space
 - **distance_metric** -  Callable - f(x1, x2)-> float
 
+### Intristic Multiscale score
+Computes MSID score (https://arxiv.org/abs/1905.11141) for embeddings
 
-## Available transformers
-### UMAP 
-# Refitting
+```python
+def intristic_multiscale_score(X: np.ndarray, _X: np.ndarray) -> float:
+```
+- **X** points in original space
+- **_X** points in transformed space
+
+### CLustering score
+This score is similar to auc score, it also uses class labels. Idea is to cluster unsupervisely points in transformed space
+and measure how much unsupervised clustering labels are similar to real class labels. 
+
+To measure this quality of clusterization two metrics are used:
+   - [adjusted random score](https://scikit-learn.org/stable/modules/generated/sklearn.metrics.adjusted_rand_score.html)
+   - [mutual info score](https://scikit-learn.org/stable/modules/generated/sklearn.metrics.adjusted_mutual_info_score.html)
+
+```python
+def clustering_score(_X: np.ndarray, y: np.ndarray) -> (float, float):
+```
+
+- **_X** - points in transformed space
+- **y** labels
+
+
 
 

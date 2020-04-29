@@ -1,5 +1,5 @@
 kind: Model
-name: "adult_scalar_monitoring_test"
+name: "adult_scalar_monitoring_vis"
 payload:
   - "src/"
   - "requirements.txt"

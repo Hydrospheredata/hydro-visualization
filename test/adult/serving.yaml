@@ -1,5 +1,5 @@
 kind: Model
-name: "adult_scalar_monitoring_test"
+name: "adult_scalar_monitoring_vis"
 payload:
   - "monitoring_model/src/"
   - "monitoring_model/requirements.txt"
@@ -76,11 +76,13 @@ contract:
       profile: numerical
 ---
 kind: Model
-name: "adult_scalar_test"
+name: "adult_scalar_vis"
 payload:
   - "model/src/"
   - "model/requirements.txt"
   - "model/classification_model.joblib"
+  - "model/sacler"
+  - "model/one_hotter"
 runtime: "hydrosphere/serving-runtime-python-3.6:0.1.2-rc0"
 install-command: "pip install -r requirements.txt"
 training-data: data/profile.csv
@@ -151,11 +153,11 @@ contract:
 monitoring:
   - name: outlier_score
     config:
-      monitoring-model: adult_scalar_monitoring_test:1
+      monitoring-model: adult_scalar_monitoring_vis:1
       operator: <=
-      threshold: 12
+      threshold:
 ---
 kind: Application
-name: adult_scalar_test
+name: adult_scalar_vis
 singular:
-  model: adult_scalar_test:1
+  model: adult_scalar_vis:1

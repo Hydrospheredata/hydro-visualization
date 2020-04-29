@@ -1,9 +1,11 @@
 kind: Model
-name: "adult_scalar_test"
+name: "adult_scalar_vis"
 payload:
-  - "model/src/"
-  - "model/requirements.txt"
-  - "model/classification_model.joblib"
+  - "src/"
+  - "requirements.txt"
+  - "classification_model.joblib"
+  - "sacler"
+  - "one_hotter"
 runtime: "hydrosphere/serving-runtime-python-3.6:0.1.2-rc0"
 install-command: "pip install -r requirements.txt"
 training-data: ../data/profile.csv
@@ -60,7 +62,7 @@ contract:
       profile: numerical
   outputs:
     embedding:
-      shape: [1, 100]
+      shape: [1, 61]
       type: double
       profile: numerical
     class:
@@ -71,10 +73,5 @@ contract:
       shape: scalar
       type: int64
       profile: numerical
-monitoring:
-  - name: outlier_score
-    config:
-      monitoring-model: adult_scalar_monitoring_test:5
-      operator: <=
-      threshold: 12
+
 

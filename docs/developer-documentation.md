@@ -322,13 +322,127 @@ We use mongodb to store parameters of model visualization transformer. For each 
 
 
 # Manifold Learning Transformers
+Manifold learning is an approach to nonlinear dimensionality reduction. It is used to visualize high-dimensional datasets.
+The simplest way to somehow visualize this data in 2D/3D is by taking a random projection of the data. 
+Though this allows some degree of visualization of the data structure, the randomness of the choice leaves much to be desired. 
+In a random projection, it is likely that the more interesting structure within the data will be lost.[[1]](https://scikit-learn.org/stable/modules/manifold.html)
+Numerous manifold learning algorithms were created to extract useful patterns in manifold and preserve them in projection: 
+TSNE, TRIMAP, UMAP, Large-Vis, Sammon's mapping. 
+
+Effect of ml algorithm on preserving manifold structure in visualization[[2]](https://arxiv.org/pdf/1802.03426.pdf):
+![](img/ml_vis.png)
+
 
 
 ## Abstract interface
-## Parametrizing transformers
+In this service common to scikit-learn algorithms interface was used.
+In [ml_transformers.transformer](../ml_transformers/transformer.py) class Transformer defines interface for all transformers that could be used
+
+```python
+class Transformer(ABC):
+    def __init__(self, parameters: Dict):
+        self.__set_params__(parameters)
+        self.__instance__, self.transformer = self.__create__()  # clear instance of transformer (not fitted into data)
+```
+- **parameters** - is a dict that defines transformer parameters. 
+We use this parameters in comparing transformers, storing in database and in requests.
+
+- **instance** - it is a clear instance of transformer with same parameters. It is used for stability metric.
+- **transformer** - it is an instance of transformer which is used for fitting.
+
+```python
+    @abstractmethod
+    def fit(self, X: np.ndarray, y=None):
+        pass
+
+    @abstractmethod
+    def transform(self, X: np.ndarray, y=None) -> np.ndarray:
+        return None
+
+    @abstractmethod
+    def fit_transform(self, X: np.ndarray, y=None) -> np.ndarray:
+        return None
+```
+- **fit** - it accepts points in N dimensional space, fits transformer.
+- **transform** - it accepts points in N dimensional space and transforms points without fitting transformer to 2D/3D. Returns points in lesser dimension.
+- **fit_transform** - it accepts points in N dimesninal space and fits transformer in manifold of those points and transforms points to 2D/3D.  Returns points in lesser dimension.
+
+> In transform we assume that self.transformer is already fitted in some manifold. If it is not, then use transformer.fit
+
+```python
+ def eval(self, X: np.ndarray, _X: np.ndarray, y=None,
+             evaluation_metrics=("global_score", "sammon_error",
+                                 "auc_score", "stability_score", "msid", "clustering"),
+             _auc_cv=5) -> Dict[str, str]:
+     """
+        Evaluates vizualization using listed evaluation_metrics names
+        :param X: original points
+        :param _X: transformed points
+        :param y: labels
+        :param evaluation_metrics: list of metrics names
+        :param _auc_cv: number of splits for acc evaluation
+        :return: dict of metric values
+        """
+```
+
+**eval** - it uses points in original space and transformed to evaluate them given a list of metrics. For some metrics, class labels are needed.
+If `y` labels are not provided then metrics `clustering` and `auc_score` will not be used. This method is already implemented. 
 
 
 ## Visualization metrics
 
+[ml_transformers.metrics](../ml_transformers/metrics.py)
 
+Manifold learning transformers have many parameters. For various manifolds we need different configuration to achieve good visualization. 
+
+Good visualization should show: 
+- good cluster separation
+- class separation
+- outliers are seen as outliers on data
+- concept drift if it is present
+
+To evaluate how good is your visualization reflecting all this features and manifold structure we created several metrics.
+Each metric aims to show you only one aspect of goodness of your visualization. 
+
+###Global Score
+
+Source: https://github.com/eamid/trimap
+
+Global score - measure of goodness of low-dimensional embedding in reflecting global structure.
+
+**Idea:**
+
+for n points:
+
+X - high dimensional data points - in Rm. X is a matrix n x m
+
+Y - low dimensional data points - in Rd. Y is a matrix n x d
+
+**Minimum reconstruction error**
+![minimum rec error](http://latex.codecogs.com/svg.latex?\begin{aligned}%20\epsilon(Y%20|%20X)%20&=\min%20\|X-A%20Y\|_{F}^{2}%20\\%20\text%20{where}\|.\|%20&-\text%20{Frobenius%20norm}%20\end{aligned})
+
+![minimum rec error](http://latex.codecogs.com/svg.latex?\|A\|_{F}=\sqrt{\sum^{m}%20\sum^{n}\left|a_{i%20j}\right|^{2}})
+
+**Optimal value for MRE**
+
+![opt val](http://latex.codecogs.com/svg.latex?A_{opt}%20=%20XY^T(YY^T)^{-1})
+
+**Global score**
+
+<img src="http://latex.codecogs.com/svg.latex?GS(Y|X)%20=%20exp(-\frac{\epsilon%20(Y|X)%20-%20\epsilon_{pca}}{\epsilon_{pca}})%20\in%20[0,1]" />
+
+
+```python
+def global_score(X: np.ndarray, Y: np.ndarray) -> np.float:
+
+```
+
+- **X** - points in original space
+- **Y** - points in transformed space
+
+
+## Available transformers
+### UMAP 
 # Refitting
+
+

@@ -87,7 +87,7 @@ def transform_task(self, method, request_json):
     if path_to_training_data:
         try:
             training_df = pd.read_csv(s3manager.fs.open(path_to_training_data,
-                                                    mode='rb'))
+                                                        mode='rb'))
         except:
             e = sys.exc_info()[0]
             logging.error(f'Couldn\'t get training data from {path_to_training_data}: {e}')
@@ -138,12 +138,21 @@ def transform_task(self, method, request_json):
     plottable_data["parameters"] = parameters
 
     result_path = s3_model_path + '/result.json'
-    s3manager.write_json(data=plottable_data, filepath=result_path)
-    db_model_info["result_file"] = result_path
+    try:
+        s3manager.write_json(data=plottable_data, filepath=result_path)
+        db_model_info["result_file"] = result_path
+    except:
+        e = sys.exc_info()[0]
+        logging.error(f'Couldn\'t save result to {result_path}: {e}')
 
     transformer_path = s3_model_path + f'/transformer_{method}_{model_name}{model_version}'
-    transformer_saved_to_s3 = s3manager.write_transformer_model(transformer,
-                                                                filepath=transformer_path)
+    try:
+        transformer_saved_to_s3 = s3manager.write_transformer_model(transformer,
+                                                                    filepath=transformer_path)
+    except:
+        e = sys.exc_info()[0]
+        logging.error(f'Couldn\'t save transformer to {transformer_path}: {e}')
+        transformer_saved_to_s3 = False
 
     if transformer_saved_to_s3:
         db_model_info['transformer_file'] = transformer_path

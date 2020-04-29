@@ -1,4 +1,5 @@
 import json
+import sys
 from datetime import datetime
 
 import pandas as pd
@@ -84,8 +85,13 @@ def transform_task(self, method, request_json):
 
     # Parsing model requests and training data
     if path_to_training_data:
-        training_df = pd.read_csv(s3manager.fs.open(path_to_training_data,
+        try:
+            training_df = pd.read_csv(s3manager.fs.open(path_to_training_data,
                                                     mode='rb'))
+        except:
+            e = sys.exc_info()[0]
+            logging.error(f'Couldn\'t get training data from {path_to_training_data}: {e}')
+            training_df = None
     else:
         training_df = None
     production_requests_df = get_production_subsample(model.id, 200)

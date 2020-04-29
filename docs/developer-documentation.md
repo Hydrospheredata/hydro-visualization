@@ -419,6 +419,7 @@ X - high dimensional data points - in Rm. X is a matrix n x m
 Y - low dimensional data points - in Rd. Y is a matrix n x d
 
 **Minimum reconstruction error**
+
 ![minimum rec error](http://latex.codecogs.com/svg.latex?\begin{aligned}%20\epsilon(Y%20|%20X)%20&=\min%20\|X-A%20Y\|_{F}^{2}%20\\%20\text%20{where}\|.\|%20&-\text%20{Frobenius%20norm}%20\end{aligned})
 
 ![minimum rec error](http://latex.codecogs.com/svg.latex?\|A\|_{F}=\sqrt{\sum^{m}%20\sum^{n}\left|a_{i%20j}\right|^{2}})
@@ -439,6 +440,60 @@ def global_score(X: np.ndarray, Y: np.ndarray) -> np.float:
 
 - **X** - points in original space
 - **Y** - points in transformed space
+
+### Auc score
+
+It measures how good simple classification algorithms such as [SVC](https://scikit-learn.org/stable/modules/generated/sklearn.svm.SVC.html) and [KNN](https://scikit-learn.org/stable/modules/generated/sklearn.neighbors.KNeighborsClassifier.html)
+perform on classifying points in transformed space. So, basically, it shows how good classes are separated from each other in visualization.
+
+```python
+def auc_score(X: np.ndarray, y: np.ndarray, cv=5, splits=None) -> Dict[str, np.float]:
+```
+
+- **X** - points in transformed space.
+- **y** - labels.
+- **cv** - number of cross-validation splits.
+- **splits** - ready indexes of splits. If splits are provided, then cv is ignored.
+
+### Stability score
+
+Measures stabilty of embedding by subsampling from data, fitting sample and full data and measuring Procrustes distance
+between two potentially comparable distributions. From https://arxiv.org/abs/1802.03426
+
+Idea: 
+
+1. Fit all data X -> Y (dim 2) and fit only subsample X' -> Y'
+2. Compute procrustes distance between corresponding points in Y {y1, y2, ... yi} and Y' {y'1, y'2, ... y'i}
+such that yi corresponds to y'i. 
+
+Procrustes distance finds optimal rotation and translation of Y' such that MSE between Y and Y'(translated) is minimal.
+
+![LaTex](http://latex.codecogs.com/svg.latex?d_{P}(X,%20Y)=\sqrt{\sum_{i=1}^{N}\left(x_{i}-y_{i}^{\prime}\right)^{2}})
+
+```python
+def stability_score(X: np.ndarray, transformer, sample_indices=None, sample_size=0.1):
+```
+
+- **X** - points in original space
+- **transformer** - transformer instance (this instance is not fitted to any manifold)
+- **sample_indices** - indeces of sample to refit transformer
+- **sample_size** - size of sample (only if not sample indices provided)
+
+### Sammon error
+
+Sammons mapping stress function. 
+
+![formula](http://latex.codecogs.com/svg.latex?E=\frac{1}{\sum_{i<j}%20d_{i%20j}^{*}}%20\sum_{i<j}%20\frac{\left(d_{i%20j}^{*}-d_{i%20j}\right)^{2}}{d_{i%20j}^{*}})
+
+- dij is a distance between point i and point j in original space
+- d*ij is a distance between pot=int i and point j in reduced space
+
+```python
+def sammon_error(X: np.ndarray, _X: np.ndarray, distance_metric=lambda x1, x2: np.linalg.norm(x1 - x2)):
+```
+- **X** - points in original space
+- **_X** - poins in transformed space
+- **distance_metric** -  Callable - f(x1, x2)-> float
 
 
 ## Available transformers

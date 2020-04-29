@@ -412,7 +412,7 @@ Good visualization should show:
 To evaluate how good is your visualization reflecting all this features and manifold structure we created several metrics.
 Each metric aims to show you only one aspect of goodness of your visualization. 
 
-###Global Score
+### Global Score
 
 Source: https://github.com/eamid/trimap
 
@@ -512,7 +512,7 @@ def intristic_multiscale_score(X: np.ndarray, _X: np.ndarray) -> float:
 - **X** points in original space
 - **_X** points in transformed space
 
-### CLustering score
+### Clustering score
 This score is similar to auc score, it also uses class labels. Idea is to cluster unsupervisely points in transformed space
 and measure how much unsupervised clustering labels are similar to real class labels. 
 

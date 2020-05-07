@@ -1,28 +1,33 @@
 import json
 import sys
 from datetime import datetime
+from time import sleep
 
 import pandas as pd
 import requests
+from hydrosdk.exceptions import ServableException
 from hydrosdk.model import Model
 from hydrosdk.monitoring import MetricSpec
+from hydrosdk.servable import Servable, ServableStatus
 from loguru import logger as logging
 
 from app import celery, s3manager, hs_cluster
-from conf import MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, CLUSTER_URL, HYDRO_VIS_BUCKET_NAME
+from conf import MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, CLUSTER_URL, HYDRO_VIS_BUCKET_NAME, \
+    EMBEDDING_FIELD
 from data_management import get_record, parse_embeddings_from_dataframe, parse_requests_dataframe, \
-    update_record, get_mongo_client, get_production_subsample
+    update_record, get_mongo_client, get_production_subsample, compute_training_embeddings
 from visualizer import transform_high_dimensional
 
 
 def valid_embedding_model(model: Model) -> [bool]:
     """
+    TODO add embedding field shape check
     Check if model returns embeddings
     :param model:
     :return:
     """
     output_names = [field.name for field in model.contract.predict.outputs]
-    if 'embedding' not in output_names:
+    if EMBEDDING_FIELD not in output_names:
         return False
     return True
 
@@ -75,7 +80,7 @@ def transform_task(self, method, request_json):
     except Exception as e:
         return {"message": f"Error {model_name}v{model_version}. Error: {e}"}, 500
     if not valid_embedding_model(model):
-        return {"message": f"Invalid model {model} contract: No 'embedding' field in outputs"}, 404
+        return {"message": f"Invalid model {model} contract: No {EMBEDDING_FIELD} field in outputs"}, 404
     path_to_training_data = get_training_data_path(model)
 
     if path_to_transformer:
@@ -98,7 +103,7 @@ def transform_task(self, method, request_json):
 
     if production_requests_df.empty:
         return f'Production data is empty', 404
-    if 'embedding' not in production_requests_df.columns:
+    if EMBEDDING_FIELD not in production_requests_df.columns:
         return "Unable to get requests embeddings", 404
 
     production_embeddings = parse_embeddings_from_dataframe(production_requests_df)
@@ -107,28 +112,25 @@ def transform_task(self, method, request_json):
     requests_data_dict = parse_requests_dataframe(production_requests_df, monitoring_models_conf, production_embeddings)
 
     logging.info(f'Parsed requests data shape: {production_embeddings.shape}')
-    training_embeddings = None
 
-    # TODO SDK
-    # if training_df is None:
-    #     training_embeddings = None
-    # elif 'embedding' in training_df.columns:
-    #     logging.debug('Training embeddings exist')
-    #     training_embeddings = np.stack(training_df['embedding'].values)
-    # else:  # infer embeddings using model
-    #     try:
-    #         servable = hs_client.deploy_servable(model_name, int(model_version))
-    #     except ValueError as e:
-    #         return {"message": f"Unable to find {model_name}v{model_version}. Error: {e}"}, 404
-    #     except Exception as e:
-    #         return {"message": f"Error {model_name}v{model_version}. Error: {e}"}, 500
-    #     except:
-    #         e = sys.exc_info()[0]
-    #         logging.error(f'Couldn\'t get model predictions: {e}')
-    #         training_embeddings = None
-    #     else:
-    #         training_embeddings = compute_training_embeddings(model, servable, training_df)
-    #         servable.delete()
+    if training_df is None:
+        training_embeddings = None
+    elif EMBEDDING_FIELD in training_df.columns:
+        logging.debug('Training embeddings exist')
+    else:
+        try:
+            servable = Servable.create(hs_cluster, model_name=model_name, model_version=int(model_version))
+            logging.info('Sleeping 200 secs')
+            sleep(200)
+            servable = Servable.find(hs_cluster, servable.name)
+            logging.info(servable.status)
+            logging.info(servable.status_message)
+        except ServableException as e:
+            logging.error(f"Couldn't create {model_name}v{model_version} servable. Error:{e}")
+            training_embeddings = None
+        else:
+            training_embeddings = compute_training_embeddings(model, servable, training_df)
+            Servable.delete(hs_cluster, servable.name)
 
     plottable_data, transformer = transform_high_dimensional(method, parameters,
                                                              training_embeddings, production_embeddings,
@@ -142,7 +144,7 @@ def transform_task(self, method, request_json):
         s3manager.write_json(data=plottable_data, filepath=result_path)
         db_model_info["result_file"] = result_path
     except:
-        e = sys.exc_info()[0]
+        e = sys.exc_info()[1]
         logging.error(f'Couldn\'t save result to {result_path}: {e}')
 
     transformer_path = s3_model_path + f'/transformer_{method}_{model_name}{model_version}'
@@ -150,7 +152,7 @@ def transform_task(self, method, request_json):
         transformer_saved_to_s3 = s3manager.write_transformer_model(transformer,
                                                                     filepath=transformer_path)
     except:
-        e = sys.exc_info()[0]
+        e = sys.exc_info()[1]
         logging.error(f'Couldn\'t save transformer to {transformer_path}: {e}')
         transformer_saved_to_s3 = False
 
@@ -162,3 +164,14 @@ def transform_task(self, method, request_json):
     logging.info(f'Request handled in {datetime.now() - start}')
 
     return {"result": plottable_data}, 200
+
+
+def wait_for_servable(name):
+    status = ServableStatus.STARTING
+    while status != ServableStatus.SERVING:
+        servable = Servable.find(hs_cluster, name)
+        status = servable.status
+        if status in [ServableStatus.NOT_AVAILABLE, ServableStatus.NOT_SERVING]:
+            return status
+        sleep(5)
+    return status

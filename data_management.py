@@ -1,6 +1,5 @@
 import json
 import random
-import sys
 import tempfile
 from time import sleep
 from typing import Dict, Optional, List, Tuple
@@ -13,12 +12,11 @@ import pyarrow.parquet as pq
 import requests
 import s3fs
 from hydrosdk.model import Model
+from hydrosdk.servable import Servable
 from loguru import logger as logging
 from pymongo import MongoClient
-from tqdm import tqdm
 
-from client import HydroServingServable
-from conf import AWS_STORAGE_ENDPOINT, CLUSTER_URL, HYDRO_VIS_BUCKET_NAME
+from conf import AWS_STORAGE_ENDPOINT, CLUSTER_URL, HYDRO_VIS_BUCKET_NAME, EMBEDDING_FIELD
 from ml_transformers.transformer import Transformer
 from ml_transformers.utils import DEFAULT_PARAMETERS, Coloring, get_top_N_neighbours
 
@@ -222,7 +220,7 @@ def parse_requests_dataframe(df, monitoring_fields: List[Tuple[str, str]], embed
 
 
 def parse_embeddings_from_dataframe(df):
-    embeddings = np.apply_along_axis(lambda x: np.array(x), arr=df['embedding'].values.tolist(), axis=0)
+    embeddings = np.apply_along_axis(lambda x: np.array(x), arr=df[EMBEDDING_FIELD].values.tolist(), axis=0)
     return embeddings
 
 
@@ -249,32 +247,30 @@ def update_record(db, method, record, model_name, model_version):
                           {"$set": record}, upsert=True)
 
 
-def compute_training_embeddings(model: Model, servable: HydroServingServable,
-                                training_data: pd.DataFrame) -> Optional[np.ndarray]:
+def compute_training_embeddings(model: Model, servable: Servable, training_data: pd.DataFrame) -> Optional[np.ndarray]:
     """
-    Computes embeddings from training data using model servable
-    :param model: instance of HydroServingModel
-    :param servable: instance of HydroServingServable
-    :param training_data: Dataframe with training data
-    :return: np.ndarray with embeddings or None if failed
+    Computes embeddings from training data using unmonitorable servable
+    :param model: model instance
+    :param servable: servable
+    :param training_data: model training data dataframe
+    :return: np.array [N, embedding_dim]
     """
-    input_names = list(map(lambda x: x.name, model.contract.predict.inputs))
-    if len(set(input_names) - set(training_data.columns)) != 0:
-        raise ValueError(
-            f'Input fields ({input_names}) are not compatible with data fields ({set(training_data.columns)})')
-    inputs = training_data[input_names]
+    predictor = servable.predictor(monitorable=False)
     embeddings = []
-    logging.debug('Embedding inference: ')
-    for i in tqdm(range(len(inputs))):
-        try:  # TODO replace with predictors
-            outputs = servable(inputs.iloc[i])
-            embeddings.append(outputs['embedding'])
-        except:
-            e = sys.exc_info()[0]
-            logging.error(f'Couldn\'t get model predictions: {e}')
+    model_inputs_names = [input.name for input in model.contract.predict.inputs]
+    n_samples = len(training_data)
+    for i in range(n_samples):
+        try:
+            sample = training_data.iloc[i].to_dict()
+            request = {k: v for k, v in sample.items() if k in model_inputs_names}
+            result = predictor.predict(request)
+        except Exception as e:
+            logging.error(f'Couldn\'t get prediction of data sample: {e}')
             return None
-
-    return np.concatenate(embeddings)
+        embeddings.append(result[EMBEDDING_FIELD])
+    embeddings = np.concatenate(embeddings, axis=0)
+    logging.info(f'Inferenced training data. Embeddings shape:  {embeddings.shape}')
+    return embeddings
 
 
 def get_production_subsample(model_id, size=1000) -> pd.DataFrame:

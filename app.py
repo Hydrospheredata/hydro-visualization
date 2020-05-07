@@ -10,9 +10,8 @@ from hydrosdk import cluster
 from jsonschema import Draft7Validator
 from loguru import logger as logging
 
-from client import HydroServingClient, HydroServingModel
 from conf import SERVING_URL, MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, DEBUG_ENV, \
-    CLUSTER_URL, SECURE, APP_PORT
+    CLUSTER_URL, SECURE, APP_PORT, EMBEDDING_FIELD
 from data_management import S3Manager, update_record, \
     get_mongo_client
 from data_management import get_record
@@ -32,14 +31,14 @@ with open('./hydro-vis-request-json-schema.json') as f:
     REQUEST_JSON_SCHEMA = json.load(f)
     validator = Draft7Validator(REQUEST_JSON_SCHEMA)
 
-if SECURE:
-    hs_client = HydroServingClient(SERVING_URL, credentials=grpc.ssl_channel_credentials())
-else:
-    hs_client = HydroServingClient(SERVING_URL)
-
-hs_cluster = cluster.Cluster(CLUSTER_URL)
-
+logging.info('Started!')
+logging.info(CLUSTER_URL)
+logging.info(SERVING_URL)
+hs_cluster = cluster.Cluster.connect(http_address=CLUSTER_URL, grpc_address=f'{SERVING_URL}:9090')
+logging.info('after cluster')
 mongo_client = get_mongo_client(MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB)
+logging.info('after mongo client')
+
 db = mongo_client['visualization']
 
 s3manager = S3Manager()
@@ -192,19 +191,6 @@ def model_status():
         response['description'] = task.info
 
     return jsonify(response)
-
-
-def valid_embedding_model(model: HydroServingModel) -> [bool]:
-    """
-    Check if model returns embeddings
-    :param model:
-    :return:
-    """
-
-    output_names = list(map(lambda x: x['name'], model.contract.contract_dict['outputs']))
-    if 'embedding' not in output_names:
-        return False
-    return True
 
 
 if __name__ == "__main__":

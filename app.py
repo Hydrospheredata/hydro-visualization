@@ -2,16 +2,14 @@ import json
 import sys
 
 import git
-import grpc
 from celery import Celery
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from hydrosdk import cluster
 from jsonschema import Draft7Validator
 from loguru import logger as logging
 
 from conf import MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, DEBUG_ENV, \
-    HS_CLUSTER_ADDRESS, APP_PORT, GRPC_UI_ADDRESS
+    APP_PORT
 from data_management import S3Manager, update_record, \
     get_mongo_client
 from data_management import get_record

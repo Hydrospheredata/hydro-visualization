@@ -1,22 +1,19 @@
 import json
 import sys
 from datetime import datetime
-from time import sleep
 
-import grpc
+import hydro_serving_grpc as hs_grpc
 import pandas as pd
 import requests
-from hydrosdk.exceptions import ServableException
 from hydrosdk.cluster import Cluster
 from hydrosdk.model import Model
 from hydrosdk.monitoring import MetricSpec
-from hydrosdk.servable import Servable, ServableStatus
+from hydrosdk.servable import Servable
 from loguru import logger as logging
-import hydro_serving_grpc as hs_grpc
 
 from app import celery, s3manager
 from conf import MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, HYDRO_VIS_BUCKET_NAME, \
-    EMBEDDING_FIELD, HS_CLUSTER_ADDRESS, GRPC_UI_ADDRESS
+    EMBEDDING_FIELD, HS_CLUSTER_ADDRESS, GRPC_PROXY_ADDRESS
 from data_management import get_record, parse_embeddings_from_dataframe, parse_requests_dataframe, \
     update_record, get_mongo_client, get_production_subsample, compute_training_embeddings
 from visualizer import transform_high_dimensional
@@ -77,7 +74,7 @@ def transform_task(self, method, request_json):
             return {"result": plottable_data}, 200
 
     try:
-        hs_cluster = Cluster(HS_CLUSTER_ADDRESS, grpc_address=GRPC_UI_ADDRESS)
+        hs_cluster = Cluster(HS_CLUSTER_ADDRESS, grpc_address=GRPC_PROXY_ADDRESS)
         model = Model.find(hs_cluster, model_name, int(model_version))
     except ValueError as e:
         return {"message": f"Unable to find {model_name}v{model_version}. Error: {e}"}, 404

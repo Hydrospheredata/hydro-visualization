@@ -8,7 +8,6 @@ import boto3
 import joblib
 import numpy as np
 import pandas as pd
-import pyarrow.parquet as pq
 import requests
 import s3fs
 from hydrosdk.model import Model
@@ -61,16 +60,6 @@ class S3Manager:
             except Exception as e:
                 if not self.fs.exists(f's3://{HYDRO_VIS_BUCKET_NAME}'):
                     logging.error(f'Couldn\'t create {HYDRO_VIS_BUCKET_NAME} bucket due to error: {e}')
-
-    def read_parquet(self, bucket_name, filename) -> Optional[pd.DataFrame]:
-        if not bucket_name or not filename:
-            return None
-        try:
-            df = pq.ParquetDataset(f's3://{bucket_name}/{filename}', filesystem=self.fs).read_pandas().to_pandas()
-        except Exception as e:
-            logging.error(f'Couldn\'t read parquet s3://{bucket_name}/{filename}. Error: {e}')
-            return None
-        return df
 
     def write_parquet(self, df: pd.DataFrame, bucket_name, filename):
         try:

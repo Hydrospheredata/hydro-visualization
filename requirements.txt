@@ -1,10 +1,9 @@
 Flask==1.1.1
 numpy
-matplotlib
 pandas
 sklearn
 scikit-learn
-git+https://github.com/Hydrospheredata/hydro-serving-sdk.git
+git+git://github.com/Hydrospheredata/hydro-serving-sdk.git@c43e122a61ac5ce4b7cde2cf06d167e7785181c6
 git+https://github.com/xgfs/msid.git
 boto3==1.12.34
 Pillow
@@ -16,7 +15,6 @@ s3fs==0.4.2
 joblib
 requests==2.22.0
 PyYAML
-pyarrow
 tqdm
 jsonschema==3.2.0
 celery[mongodb]==4.4.0rc3

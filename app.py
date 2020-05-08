@@ -10,8 +10,8 @@ from hydrosdk import cluster
 from jsonschema import Draft7Validator
 from loguru import logger as logging
 
-from conf import SERVING_URL, MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, DEBUG_ENV, \
-    CLUSTER_URL, SECURE, APP_PORT, EMBEDDING_FIELD
+from conf import MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, DEBUG_ENV, \
+    HS_CLUSTER_ADDRESS, APP_PORT, GRPC_UI_ADDRESS
 from data_management import S3Manager, update_record, \
     get_mongo_client
 from data_management import get_record
@@ -31,13 +31,7 @@ with open('./hydro-vis-request-json-schema.json') as f:
     REQUEST_JSON_SCHEMA = json.load(f)
     validator = Draft7Validator(REQUEST_JSON_SCHEMA)
 
-logging.info('Started!')
-logging.info(CLUSTER_URL)
-logging.info(SERVING_URL)
-hs_cluster = cluster.Cluster.connect(http_address=CLUSTER_URL, grpc_address=f'{SERVING_URL}:9090')
-logging.info('after cluster')
 mongo_client = get_mongo_client(MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB)
-logging.info('after mongo client')
 
 db = mongo_client['visualization']
 

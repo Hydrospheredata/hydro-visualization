@@ -3,17 +3,20 @@ import sys
 from datetime import datetime
 from time import sleep
 
+import grpc
 import pandas as pd
 import requests
 from hydrosdk.exceptions import ServableException
+from hydrosdk.cluster import Cluster
 from hydrosdk.model import Model
 from hydrosdk.monitoring import MetricSpec
 from hydrosdk.servable import Servable, ServableStatus
 from loguru import logger as logging
+import hydro_serving_grpc as hs_grpc
 
-from app import celery, s3manager, hs_cluster
-from conf import MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, CLUSTER_URL, HYDRO_VIS_BUCKET_NAME, \
-    EMBEDDING_FIELD
+from app import celery, s3manager
+from conf import MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, HYDRO_VIS_BUCKET_NAME, \
+    EMBEDDING_FIELD, HS_CLUSTER_ADDRESS, GRPC_UI_ADDRESS
 from data_management import get_record, parse_embeddings_from_dataframe, parse_requests_dataframe, \
     update_record, get_mongo_client, get_production_subsample, compute_training_embeddings
 from visualizer import transform_high_dimensional
@@ -38,7 +41,7 @@ def get_training_data_path(model: Model) -> str:
     :param model:
     :return:
     """
-    response = requests.get(f'{CLUSTER_URL}/monitoring/training_data?modelVersionId={model.id}')
+    response = requests.get(f'{HS_CLUSTER_ADDRESS}/monitoring/training_data?modelVersionId={model.id}')
     training_data_s3 = json.loads(response.text)
     if training_data_s3:
         return training_data_s3[0]
@@ -47,7 +50,7 @@ def get_training_data_path(model: Model) -> str:
 
 
 def get_production_data_sample(model_id, sample_size=1000) -> pd.DataFrame:
-    response = requests.get(f'{CLUSTER_URL}/monitoring/checks/subsample/{model_id}?size={sample_size}')
+    response = requests.get(f'{HS_CLUSTER_ADDRESS}/monitoring/checks/subsample/{model_id}?size={sample_size}')
     return pd.DataFrame.from_dict(response.json())
 
 
@@ -74,6 +77,7 @@ def transform_task(self, method, request_json):
             return {"result": plottable_data}, 200
 
     try:
+        hs_cluster = Cluster(HS_CLUSTER_ADDRESS, grpc_address=GRPC_UI_ADDRESS)
         model = Model.find(hs_cluster, model_name, int(model_version))
     except ValueError as e:
         return {"message": f"Unable to find {model_name}v{model_version}. Error: {e}"}, 404
@@ -119,13 +123,16 @@ def transform_task(self, method, request_json):
         logging.debug('Training embeddings exist')
     else:
         try:
-            servable = Servable.create(hs_cluster, model_name=model_name, model_version=int(model_version))
-            logging.info('Sleeping 200 secs')
-            sleep(200)
-            servable = Servable.find(hs_cluster, servable.name)
-            logging.info(servable.status)
-            logging.info(servable.status_message)
-        except ServableException as e:
+            manager_stub = hs_grpc.manager.ManagerServiceStub(channel=hs_cluster.channel)
+            deploy_request = hs_grpc.manager.DeployServableRequest(version_id=model.id,
+                                                                   metadata={"created_by": "hydro_vis"})
+            for servable_proto in manager_stub.DeployServable(deploy_request):
+                logging.info(f"{servable_proto.name} is {servable_proto.status}")
+            if servable_proto.status != 3:
+                raise ValueError(f"Invalid servable state came from GRPC stream - {servable_proto.status}")
+            servable = Servable.find(hs_cluster, servable_name=servable_proto.name)
+
+        except Exception as e:
             logging.error(f"Couldn't create {model_name}v{model_version} servable. Error:{e}")
             training_embeddings = None
         else:
@@ -164,14 +171,3 @@ def transform_task(self, method, request_json):
     logging.info(f'Request handled in {datetime.now() - start}')
 
     return {"result": plottable_data}, 200
-
-
-def wait_for_servable(name):
-    status = ServableStatus.STARTING
-    while status != ServableStatus.SERVING:
-        servable = Servable.find(hs_cluster, name)
-        status = servable.status
-        if status in [ServableStatus.NOT_AVAILABLE, ServableStatus.NOT_SERVING]:
-            return status
-        sleep(5)
-    return status

@@ -2,17 +2,14 @@ import json
 import sys
 
 import git
-import grpc
 from celery import Celery
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from hydrosdk import cluster
 from jsonschema import Draft7Validator
 from loguru import logger as logging
 
-from client import HydroServingClient, HydroServingModel
-from conf import SERVING_URL, MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, DEBUG_ENV, \
-    CLUSTER_URL, SECURE, APP_PORT
+from conf import MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, DEBUG_ENV, \
+    APP_PORT
 from data_management import S3Manager, update_record, \
     get_mongo_client
 from data_management import get_record
@@ -32,14 +29,8 @@ with open('./hydro-vis-request-json-schema.json') as f:
     REQUEST_JSON_SCHEMA = json.load(f)
     validator = Draft7Validator(REQUEST_JSON_SCHEMA)
 
-if SECURE:
-    hs_client = HydroServingClient(SERVING_URL, credentials=grpc.ssl_channel_credentials())
-else:
-    hs_client = HydroServingClient(SERVING_URL)
-
-hs_cluster = cluster.Cluster(CLUSTER_URL)
-
 mongo_client = get_mongo_client(MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB)
+
 db = mongo_client['visualization']
 
 s3manager = S3Manager()
@@ -192,19 +183,6 @@ def model_status():
         response['description'] = task.info
 
     return jsonify(response)
-
-
-def valid_embedding_model(model: HydroServingModel) -> [bool]:
-    """
-    Check if model returns embeddings
-    :param model:
-    :return:
-    """
-
-    output_names = list(map(lambda x: x['name'], model.contract.contract_dict['outputs']))
-    if 'embedding' not in output_names:
-        return False
-    return True
 
 
 if __name__ == "__main__":

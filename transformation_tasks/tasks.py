@@ -74,6 +74,7 @@ def transform_task(self, method, request_json):
             return {"result": plottable_data}, 200
 
     try:
+        logging.info(f'Connecting to cluster')
         hs_cluster = Cluster(HS_CLUSTER_ADDRESS, grpc_address=GRPC_PROXY_ADDRESS)
         model = Model.find(hs_cluster, model_name, int(model_version))
     except ValueError as e:
@@ -120,6 +121,7 @@ def transform_task(self, method, request_json):
         logging.debug('Training embeddings exist')
     else:
         try:
+            logging.info('Creating servable')
             manager_stub = hs_grpc.manager.ManagerServiceStub(channel=hs_cluster.channel)
             deploy_request = hs_grpc.manager.DeployServableRequest(version_id=model.id,
                                                                    metadata={"created_by": "hydro_vis"})

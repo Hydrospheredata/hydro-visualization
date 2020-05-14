@@ -5,6 +5,7 @@ from datetime import datetime
 import hydro_serving_grpc as hs_grpc
 import pandas as pd
 import requests
+from celery.exceptions import Ignore
 from hydrosdk.cluster import Cluster
 from hydrosdk.model import Model
 from hydrosdk.monitoring import MetricSpec
@@ -13,7 +14,7 @@ from loguru import logger as logging
 
 from app import celery, s3manager
 from conf import MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, HYDRO_VIS_BUCKET_NAME, \
-    EMBEDDING_FIELD, HS_CLUSTER_ADDRESS, GRPC_PROXY_ADDRESS
+    EMBEDDING_FIELD, HS_CLUSTER_ADDRESS, GRPC_PROXY_ADDRESS, TaskStates
 from data_management import get_record, parse_embeddings_from_dataframe, parse_requests_dataframe, \
     update_record, get_mongo_client, get_production_subsample, compute_training_embeddings
 from visualizer import transform_high_dimensional
@@ -53,6 +54,7 @@ def get_production_data_sample(model_id, sample_size=1000) -> pd.DataFrame:
 
 @celery.task(bind=True)
 def transform_task(self, method, request_json):
+    self.update_state(state=TaskStates.STARTED)
     start = datetime.now()
     mongo_client = get_mongo_client(MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB)
     db = mongo_client['visualization']
@@ -78,11 +80,18 @@ def transform_task(self, method, request_json):
         hs_cluster = Cluster(HS_CLUSTER_ADDRESS, grpc_address=GRPC_PROXY_ADDRESS)
         model = Model.find(hs_cluster, model_name, int(model_version))
     except ValueError as e:
-        return {"message": f"Unable to find {model_name}v{model_version}. Error: {e}"}, 404
+        self.update_state(state=TaskStates.ERROR,
+                          meta={'message': f"Error: {e}", 'code': 404})
+        raise Ignore()
     except Exception as e:
-        return {"message": f"Error {model_name}v{model_version}. Error: {e}"}, 500
+        self.update_state(state=TaskStates.ERROR,
+                          meta={'message': f"Error: {e}", 'code': 500})
+        raise Ignore()
     if not valid_embedding_model(model):
-        return {"message": f"Invalid model {model} contract: No {EMBEDDING_FIELD} field in outputs"}, 404
+        self.update_state(state=TaskStates.NOT_SUPPORTED,
+                          meta={'message': f"Invalid model {model} contract: No {EMBEDDING_FIELD} field in outputs",
+                                'code': 404})
+        raise Ignore()
     path_to_training_data = get_training_data_path(model)
 
     if path_to_transformer:
@@ -104,9 +113,15 @@ def transform_task(self, method, request_json):
     production_requests_df = get_production_subsample(model.id, 200)
 
     if production_requests_df.empty:
-        return f'Production data is empty', 404
+        self.update_state(state=TaskStates.NO_DATA,
+                          meta={'message': f'{model_name}v{model_version} model production data  is empty',
+                                'code': 404})
+        raise Ignore()
     if EMBEDDING_FIELD not in production_requests_df.columns:
-        return "Unable to get requests embeddings", 404
+        self.update_state(state=TaskStates.ERROR,
+                          meta={'message': f"Unable to get requests embeddings of {model_name}v{model_version} model",
+                                'code': 404})
+        raise Ignore()
 
     production_embeddings = parse_embeddings_from_dataframe(production_requests_df)
     monitoring_models_conf = [(metric.name, metric.config.threshold_op, metric.config.threshold) for metric in

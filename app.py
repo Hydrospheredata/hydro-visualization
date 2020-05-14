@@ -9,7 +9,7 @@ from jsonschema import Draft7Validator
 from loguru import logger as logging
 
 from conf import MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, DEBUG_ENV, \
-    APP_PORT
+    APP_PORT, TaskStates
 from data_management import S3Manager, update_record, \
     get_mongo_client
 from data_management import get_record
@@ -92,7 +92,8 @@ def transform(method: str):
     :return: task_id if not found
     """
     if method not in AVAILABLE_TRANSFORMERS:
-        return jsonify({"message": f"Transformer method {method} is  not implemented."}), 400
+        return jsonify(
+            {"message": f"Transformer method {method} is  not implemented.", 'status': TaskStates.NOT_SUPPORTED}), 400
 
     request_json = request.get_json()
     if not validator.is_valid(request_json):
@@ -117,12 +118,13 @@ def refit_model(method):
     refit_transformer = request.args.get('refit_transformer', True)
 
     if method not in AVAILABLE_TRANSFORMERS:
-        return jsonify({"message": f"Transformer method {method} is  not implemented."}), 400
+        return jsonify(
+            {"message": f"Transformer method {method} is  not implemented.", 'status': TaskStates.NOT_SUPPORTED}), 400
 
     request_json = request.get_json()
     if not validator.is_valid(request_json):
         error_message = "\n".join([error.message for error in validator.iter_errors(request_json)])
-        return jsonify({"message": error_message}), 400
+        return jsonify({"message": error_message, 'status': TaskStates.NOT_SUPPORTED}), 400
     model_name = request_json.get('model_name')
     model_version = str(request_json.get('model_version'))
     db_model_info = get_record(db, method, model_name, model_version)
@@ -171,18 +173,25 @@ def model_status():
         'state': task.state,
         'task_id': task_id
     }
+
     if task.state == 'PENDING':
         # job did not start yet, do nothing
+        code = 201
         pass
+    elif task.state == 'PROGRESS':
+        # task is accepted by worker
+        code = 202
     elif task.state == 'SUCCESS':
         # job completed, return result
         result, code = task.get()
         response.update(result)
     else:
         # something went wrong in the background job, return the exception raised
-        response['description'] = task.info
+        info = task.info
+        response['message'] = info['message']
+        code = info['code']
 
-    return jsonify(response)
+    return jsonify(response), code
 
 
 if __name__ == "__main__":

@@ -9,7 +9,7 @@ from jsonschema import Draft7Validator
 from loguru import logger as logging
 
 from conf import MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, DEBUG_ENV, \
-    APP_PORT, TaskStates
+    APP_PORT
 from data_management import S3Manager, update_record, \
     get_mongo_client
 from data_management import get_record
@@ -92,7 +92,7 @@ def transform(method: str):
     """
     if method not in AVAILABLE_TRANSFORMERS:
         return jsonify(
-            {"message": f"Transformer method {method} is  not implemented.", 'status': TaskStates.NOT_SUPPORTED}), 400
+            {"message": f"Transformer method {method} is  not implemented."}), 400
 
     request_json = request.get_json()
     if not validator.is_valid(request_json):
@@ -118,12 +118,12 @@ def refit_model(method):
 
     if method not in AVAILABLE_TRANSFORMERS:
         return jsonify(
-            {"message": f"Transformer method {method} is  not implemented.", 'status': TaskStates.NOT_SUPPORTED}), 400
+            {"message": f"Transformer method {method} is  not implemented."}), 400
 
     request_json = request.get_json()
     if not validator.is_valid(request_json):
         error_message = "\n".join([error.message for error in validator.iter_errors(request_json)])
-        return jsonify({"message": error_message, 'status': TaskStates.NOT_SUPPORTED}), 400
+        return jsonify({"message": error_message}), 400
     model_name = request_json.get('model_name')
     model_version = str(request_json.get('model_version'))
     db_model_info = get_record(db, method, model_name, model_version)

@@ -175,11 +175,11 @@ def model_status():
 
     if task.state == 'PENDING':
         # job did not start yet, do nothing
-        code = 201
+        code = 200
         pass
     elif task.state == 'STARTED':
         # task is accepted by worker
-        code = 202
+        code = 200
     elif task.state == 'SUCCESS':
         # job completed, return result
         result, code = task.get()

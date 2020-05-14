@@ -64,7 +64,6 @@ def make_celery(app):
 
 
 celery = make_celery(app)
-
 celery.autodiscover_tasks(["transformation_tasks"], force=True)
 celery.conf.update({"CELERY_DISABLE_RATE_LIMITS": True})
 
@@ -92,7 +91,8 @@ def transform(method: str):
     :return: task_id if not found
     """
     if method not in AVAILABLE_TRANSFORMERS:
-        return jsonify({"message": f"Transformer method {method} is  not implemented."}), 400
+        return jsonify(
+            {"message": f"Transformer method {method} is  not implemented."}), 400
 
     request_json = request.get_json()
     if not validator.is_valid(request_json):
@@ -117,7 +117,8 @@ def refit_model(method):
     refit_transformer = request.args.get('refit_transformer', True)
 
     if method not in AVAILABLE_TRANSFORMERS:
-        return jsonify({"message": f"Transformer method {method} is  not implemented."}), 400
+        return jsonify(
+            {"message": f"Transformer method {method} is  not implemented."}), 400
 
     request_json = request.get_json()
     if not validator.is_valid(request_json):
@@ -171,18 +172,25 @@ def model_status():
         'state': task.state,
         'task_id': task_id
     }
+
     if task.state == 'PENDING':
         # job did not start yet, do nothing
+        code = 200
         pass
+    elif task.state == 'STARTED':
+        # task is accepted by worker
+        code = 200
     elif task.state == 'SUCCESS':
         # job completed, return result
         result, code = task.get()
         response.update(result)
     else:
         # something went wrong in the background job, return the exception raised
-        response['description'] = task.info
+        info = task.info
+        response['message'] = info['message']
+        code = info['code']
 
-    return jsonify(response)
+    return jsonify(response), code
 
 
 if __name__ == "__main__":

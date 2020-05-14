@@ -52,9 +52,8 @@ def get_production_data_sample(model_id, sample_size=1000) -> pd.DataFrame:
     return pd.DataFrame.from_dict(response.json())
 
 
-@celery.task(bind=True)
+@celery.task(bind=True, track_started=True)
 def transform_task(self, method, request_json):
-    self.update_state(state=TaskStates.STARTED)
     start = datetime.now()
     mongo_client = get_mongo_client(MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB)
     db = mongo_client['visualization']

@@ -64,7 +64,6 @@ def make_celery(app):
 
 
 celery = make_celery(app)
-
 celery.autodiscover_tasks(["transformation_tasks"], force=True)
 celery.conf.update({"CELERY_DISABLE_RATE_LIMITS": True})
 
@@ -178,7 +177,7 @@ def model_status():
         # job did not start yet, do nothing
         code = 201
         pass
-    elif task.state == 'PROGRESS':
+    elif task.state == 'STARTED':
         # task is accepted by worker
         code = 202
     elif task.state == 'SUCCESS':

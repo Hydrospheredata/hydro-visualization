@@ -19,7 +19,6 @@ EMBEDDING_FIELD = 'embedding'
 
 
 class TaskStates:
-    STARTED = 'STARTED'
     NOT_SUPPORTED = 'NOT_SUPPORTED'
     ERROR = 'ERROR'
     NO_DATA = 'NO_DATA'

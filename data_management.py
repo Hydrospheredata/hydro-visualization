@@ -1,20 +1,21 @@
 import json
+import random
 import tempfile
+from time import sleep
 from typing import Dict, Optional, List, Tuple
 
+import boto3
 import joblib
 import numpy as np
 import pandas as pd
-import pyarrow.parquet as pq
 import requests
 import s3fs
 from hydrosdk.model import Model
+from hydrosdk.servable import Servable
 from loguru import logger as logging
 from pymongo import MongoClient
-from tqdm import tqdm
 
-from client import HydroServingServable
-from conf import AWS_STORAGE_ENDPOINT, CLUSTER_URL
+from conf import AWS_STORAGE_ENDPOINT, HS_CLUSTER_ADDRESS, HYDRO_VIS_BUCKET_NAME, EMBEDDING_FIELD
 from ml_transformers.transformer import Transformer
 from ml_transformers.utils import DEFAULT_PARAMETERS, Coloring, get_top_N_neighbours
 
@@ -27,25 +28,38 @@ def get_mongo_client(mongo_url, mongo_port, mongo_user, mongo_pass, mongo_auth_d
 
 class S3Manager:
     def __init__(self):
+
         if AWS_STORAGE_ENDPOINT:
+
             self.fs = s3fs.S3FileSystem(
                 anon=False,
                 client_kwargs={
                     'endpoint_url': AWS_STORAGE_ENDPOINT
-                }
+                },
+                config_kwargs={'s3': {'addressing_style': 'path'}}
             )
+
+            from botocore.client import Config
+            conf = Config(s3={'addressing_style': 'path'})
+
+            boto_client = boto3.client(
+                's3',
+                endpoint_url=AWS_STORAGE_ENDPOINT,
+                config=conf
+            )
+
         else:
             self.fs = s3fs.S3FileSystem()
-
-    def read_parquet(self, bucket_name, filename) -> Optional[pd.DataFrame]:
-        if not bucket_name or not filename:
-            return None
-        try:
-            df = pq.ParquetDataset(f's3://{bucket_name}/{filename}', filesystem=self.fs).read_pandas().to_pandas()
-        except Exception as e:
-            logging.error(f'Couldn\'t read parquet s3://{bucket_name}/{filename}. Error: {e}')
-            return None
-        return df
+            boto_client = boto3.client(
+                's3')
+        sleep(random.random())
+        if not self.fs.exists(f's3://{HYDRO_VIS_BUCKET_NAME}'):
+            logging.info(f'Creating {HYDRO_VIS_BUCKET_NAME} bucket')
+            try:
+                boto_client.create_bucket(Bucket=HYDRO_VIS_BUCKET_NAME)
+            except Exception as e:
+                if not self.fs.exists(f's3://{HYDRO_VIS_BUCKET_NAME}'):
+                    logging.error(f'Couldn\'t create {HYDRO_VIS_BUCKET_NAME} bucket due to error: {e}')
 
     def write_parquet(self, df: pd.DataFrame, bucket_name, filename):
         try:
@@ -125,6 +139,7 @@ class S3Manager:
                 return None
             return transformer
 
+
 def parse_requests_dataframe(df, monitoring_fields: List[Tuple[str, str]], embeddings: np.ndarray) -> Dict:
     """
     Extracts:
@@ -149,7 +164,7 @@ def parse_requests_dataframe(df, monitoring_fields: List[Tuple[str, str]], embed
         coloring_info['coloring_type'] = coloring.value
         return coloring_info
 
-    requests_ids = df['_hs_request_id'].values.tolist()
+    requests_ids = df['_id'].values.tolist()
 
     top_N_neighbours = get_top_N_neighbours(embeddings, N=50)
     counterfactuals = [[] for _ in range(len(top_N_neighbours))]
@@ -194,7 +209,7 @@ def parse_requests_dataframe(df, monitoring_fields: List[Tuple[str, str]], embed
 
 
 def parse_embeddings_from_dataframe(df):
-    embeddings = np.apply_along_axis(lambda x: np.array(x), arr=df['embedding'].values.tolist(), axis=0)
+    embeddings = np.apply_along_axis(lambda x: np.array(x), arr=df[EMBEDDING_FIELD].values.tolist(), axis=0)
     return embeddings
 
 
@@ -221,31 +236,34 @@ def update_record(db, method, record, model_name, model_version):
                           {"$set": record}, upsert=True)
 
 
-def compute_training_embeddings(model: Model, servable: HydroServingServable,
-                                training_data: pd.DataFrame) -> Optional[np.ndarray]:
+def compute_training_embeddings(model: Model, servable: Servable, training_data: pd.DataFrame) -> Optional[np.ndarray]:
     """
-    Computes embeddings from training data using model servable
-    :param model: instance of HydroServingModel
-    :param servable: instance of HydroServingServable
-    :param training_data: Dataframe with training data
-    :return: np.ndarray with embeddings or None if failed
+    Computes embeddings from training data using unmonitorable servable
+    :param model: model instance
+    :param servable: servable
+    :param training_data: model training data dataframe
+    :return: np.array [N, embedding_dim]
     """
-    input_names = list(map(lambda x: x.name, model.contract.predict.inputs))
-    if len(set(input_names) - set(training_data.columns)) != 0:
-        raise ValueError(
-            f'Input fields ({input_names}) are not compatible with data fields ({set(training_data.columns)})')
-    inputs = training_data[input_names]
+    predictor = servable.predictor(monitorable=False)
     embeddings = []
-    logging.debug('Embedding inference: ')
-    for i in tqdm(range(len(inputs))):
-        outputs = servable(inputs.iloc[i])
-        embeddings.append(outputs['embedding'])
-
-    return np.concatenate(embeddings)
+    model_inputs_names = [input.name for input in model.contract.predict.inputs]
+    n_samples = len(training_data)
+    for i in range(n_samples):
+        try:
+            sample = training_data.iloc[i].to_dict()
+            request = {k: v for k, v in sample.items() if k in model_inputs_names}
+            result = predictor.predict(request)
+        except Exception as e:
+            logging.error(f'Couldn\'t get prediction of data sample: {e}')
+            return None
+        embeddings.append(result[EMBEDDING_FIELD])
+    embeddings = np.concatenate(embeddings, axis=0)
+    logging.info(f'Inferenced training data. Embeddings shape:  {embeddings.shape}')
+    return embeddings
 
 
 def get_production_subsample(model_id, size=1000) -> pd.DataFrame:
-    r = requests.get(f'{CLUSTER_URL}/monitoring/checks/subsample/{model_id}?size={size}')
+    r = requests.get(f'{HS_CLUSTER_ADDRESS}/monitoring/checks/subsample/{model_id}?size={size}')
     if r.status_code != 200:
         return pd.DataFrame()
     return pd.DataFrame.from_dict(r.json())

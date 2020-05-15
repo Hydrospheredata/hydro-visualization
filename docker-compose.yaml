@@ -7,8 +7,8 @@ services:
     build: .
     environment:
       - MONGO_URL=mongodb
-      - SERVING_URL=
-      - CLUSTER_URL=
+      - GRPC_UI_ADDRESS=
+      - HTTP_UI_ADDRESS=
       - SECURE=True
       - AWS_ACCESS_KEY_ID=minio
       - AWS_SECRET_ACCESS_KEY=minio123
@@ -22,8 +22,8 @@ services:
     build: .
     environment:
       - MONGO_URL=mongodb
-      - SERVING_URL=
-      - CLUSTER_URL=
+      - GRPC_UI_ADDRESS=
+      - HTTP_UI_ADDRESS=
       - SECURE=True
       - AWS_ACCESS_KEY_ID=minio
       - AWS_SECRET_ACCESS_KEY=minio123

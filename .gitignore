@@ -25,8 +25,7 @@ venv
 *.tax2010
 *.vcf
 *.xml
-!test/adult/data/validation.csv
-!test/adult/data/profile.csv
+!test/adult/data/*
 #!! ERROR: jupyternotebook is undefined. Use list command to see defined gitignore types !!#
 
 ### JupyterNotebooks ###

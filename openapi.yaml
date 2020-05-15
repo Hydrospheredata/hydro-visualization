@@ -34,8 +34,7 @@ paths:
         schema:
           type: string
         description: Transformer name from ["umap", "trimap","tsne"]. For now only ["umap"].
-      description: transformer - manifold learning transformer from ["umap", "trimap",
-        "tsne"]. For now only ["umap"].
+      description: Request for transformed embeddings of a model to plot. Service creates task and starts working on it. It is not fast (unless you have previously transformed requests for your model and not many new requests appeared since that).
       operationId: transform
       requestBody:
         description: Embedding parameters
@@ -82,10 +81,12 @@ paths:
         schema:
           type: boolean
           default: true
-      description: Starts job on inferencing new data or refitting transformer model.
+        description: If True, then transformer is refitted on new data. Otherwise, new data is inferenced using old data manifold. Default False
+
+      description: Silently invokes refitting of transformer on new produciton subsample of a given model.
       responses:
         200:
-          description: successful operation
+          description: Service creates task and starts working on it.
           content:
             application/json:
               schema:
@@ -105,9 +106,10 @@ paths:
         required: true
         schema:
           type: string
+        description: id of a task returned by POST /visualization/jobs/ or POST /visualization/plottable_embeddings/
       responses:
         200:
-          description: successfully started task
+          description: successfully started or finished task
           content:
             application/json:
               schema:
@@ -190,14 +192,17 @@ components:
       - stability_score
       - msid
       - clustering
+      description: Metrics that are used to evaluate how good will visualization reflect your real multidimensional data in 2D/3D plot. More on visualization metrics you can find in documentation
     EmbeddingRequest:
       type: object
       properties:
         model_name:
           type: string
+          description: name of a model that has `embedding` field in output
         model_version:
           type: integer
           format: int64
+          description: version of a model
         visualization_metrics:
           type: array
           items:

@@ -27,6 +27,10 @@ HYDRO_VIS_BUCKET_NAME = os.getenv('BUCKET_NAME', 'hydro-vis')
 
 ## API
 
+### Task states:
+
+![Task states](status.png)
+
 Whole API description is available [here](openapi.yaml)
 
 1.**POST** /visualization/plottable_embeddings/<method>
@@ -66,8 +70,6 @@ Whole API description is available [here](openapi.yaml)
 3. **GET** /visualization/jobs?task_id=22e86484-7d90-49fd-a3e1-329b978ee18c
 
 Returns state of a task and result if ready
-
-states: = ['PENDING', 'RECEIVED', 'STARTED', 'FAILURE', 'REVOKED',  'RETRY'] (Source: [Celery Docs](https://docs.celeryproject.org/en/latest/reference/celery.states.html#all-states))
 
    response_json(SUCCESS):
 ```json

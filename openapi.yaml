@@ -1,8 +1,8 @@
 openapi: 3.0.1
 info:
-  title: Hydro-vis
-  description: AAAA
-  termsOfService: kek
+  title: Hydro-visualization
+  description: Visualiation service api description
+  termsOfService: a
   contact:
     email: apiteam@swagger.io
   license:
@@ -90,6 +90,11 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TaskResponse'
+
+        400:
+          description: Wrong request body or method name
+          content: {}
+
     get:
       tags:
       - Jobs
@@ -102,11 +107,25 @@ paths:
           type: string
       responses:
         200:
-          description: succesfully retreived information about task
+          description: successfully started task
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/TaskResult'
+
+        404:
+          description: Invalid Input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskResult'
+        500:
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskResult'
+
 
 
   /params/{method}:
@@ -151,6 +170,17 @@ components:
           properties: {}
         use_labels:
           type: boolean
+
+    TaskStates:
+      type: string
+      enum:
+      - PENDING
+      - STARTED
+      - SUCCESS
+      - NOT_SUPPORTED
+      - ERROR
+      - NO_DATA
+
     VisualizationMetrics:
       type: string
       enum:
@@ -278,9 +308,10 @@ components:
           $ref: '#/components/schemas/EmbeddingResult'
         state:
           type: string
+          $ref: '#/components/schemas/TaskStates'
         task_id:
           type: string
-        description:
+        message:
           type: string
       required:
       - state

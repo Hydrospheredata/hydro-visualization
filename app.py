@@ -5,11 +5,13 @@ import git
 from celery import Celery
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from hydrosdk.cluster import Cluster
+from hydrosdk.model import Model
 from jsonschema import Draft7Validator
 from loguru import logger as logging
 
 from conf import MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, DEBUG_ENV, \
-    APP_PORT
+    APP_PORT, HS_CLUSTER_ADDRESS, GRPC_PROXY_ADDRESS, EMBEDDING_FIELD
 from data_management import S3Manager, update_record, \
     get_mongo_client
 from data_management import get_record
@@ -136,6 +138,25 @@ def refit_model(method):
         'task_id': result.task_id}), 202
 
 
+@app.route(PREFIX + '/supported', methods=['GET'])
+def supported():
+    model_name = request.args.get('model_name')
+    model_version = int(request.args.get('model_version'))
+    try:
+        logging.info(f'Connecting to cluster')
+        hs_cluster = Cluster(HS_CLUSTER_ADDRESS, grpc_address=GRPC_PROXY_ADDRESS)
+        model = Model.find(hs_cluster, model_name, int(model_version))
+    except ValueError as e:
+        return {"supported": False, "message": f"Unable to find {model_name}v{model_version}"}, 200
+    except Exception as e:
+        return {"supported": False, "message": f"Could not check if model is valid. Error: {e}"}, 200
+
+    if valid_embedding_model(model):
+        return {"supported": True, "message": "Model is supported"}, 200
+    else:
+        return {"supported": False, "message": f"No '{EMBEDDING_FIELD}' field in model output fields"}, 200
+
+
 @app.route(PREFIX + '/params/<method>', methods=['POST'])
 def set_params(method):
     """
@@ -191,6 +212,19 @@ def model_status():
         code = info['code']
 
     return jsonify(response), code
+
+
+def valid_embedding_model(model: Model) -> [bool]:
+    """
+    TODO add embedding field shape check
+    Check if model returns embeddings
+    :param model:
+    :return:
+    """
+    output_names = [field.name for field in model.contract.predict.outputs]
+    if EMBEDDING_FIELD not in output_names:
+        return False
+    return True
 
 
 if __name__ == "__main__":

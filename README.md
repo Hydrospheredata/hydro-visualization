@@ -120,7 +120,7 @@ Returns state of a task and result if ready
     ```json
    {
    "model_name": "efficientnet",
-   "model_version": "12",
+   "model_version": 12,
    "parameters": {"n_neighbours": 15,
                   "min_dist": 0.1,
                   "metric":  "cosine"},
@@ -136,6 +136,15 @@ Returns state of a task and result if ready
     200 - Success
     
 
+3. **GET** /visualization/supported?model_name=adult_scalar_test&model_version=1
+
+   
+    ```
+   **response**
+   ```json
+    {"supported": true, "message":""}, 200
+    {"supported": false, "message":"Some message"}, 200
+    ```
 
 
 ## Demo

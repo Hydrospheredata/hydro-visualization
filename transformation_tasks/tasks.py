@@ -12,25 +12,12 @@ from hydrosdk.monitoring import MetricSpec
 from hydrosdk.servable import Servable
 from loguru import logger as logging
 
-from app import celery, s3manager
+from app import celery, s3manager, valid_embedding_model
 from conf import MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, HYDRO_VIS_BUCKET_NAME, \
     EMBEDDING_FIELD, HS_CLUSTER_ADDRESS, GRPC_PROXY_ADDRESS, TaskStates
 from data_management import get_record, parse_embeddings_from_dataframe, parse_requests_dataframe, \
     update_record, get_mongo_client, get_production_subsample, compute_training_embeddings
 from visualizer import transform_high_dimensional
-
-
-def valid_embedding_model(model: Model) -> [bool]:
-    """
-    TODO add embedding field shape check
-    Check if model returns embeddings
-    :param model:
-    :return:
-    """
-    output_names = [field.name for field in model.contract.predict.outputs]
-    if EMBEDDING_FIELD not in output_names:
-        return False
-    return True
 
 
 def get_training_data_path(model: Model) -> str:

@@ -140,12 +140,8 @@ def refit_model(method):
 
 @app.route(PREFIX + '/supported', methods=['GET'])
 def supported():
-    request_json = request.get_json()
-    if not validator.is_valid(request_json):
-        error_message = "\n".join([error.message for error in validator.iter_errors(request_json)])
-        return jsonify({"supported": False, "message": error_message}), 400
-    model_name = request_json['model_name']
-    model_version = request_json['model_version']
+    model_name = request.args.get('model_name')
+    model_version = int(request.args.get('model_version'))
     try:
         logging.info(f'Connecting to cluster')
         hs_cluster = Cluster(HS_CLUSTER_ADDRESS, grpc_address=GRPC_PROXY_ADDRESS)

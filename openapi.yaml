@@ -14,7 +14,7 @@ externalDocs:
   url: http://swagger.io
 servers:
 - url: https://localhost/
-- url: http://localhost/
+- url: http://localhost:5000/
 tags:
 - name: Embeddings
   description: embeddings
@@ -22,7 +22,7 @@ tags:
     description: Find out more
     url: http://google.com
 paths:
-  /plottable_embeddings/{method}:
+  /visualization/plottable_embeddings/{method}:
     post:
       tags:
       - Embeddings
@@ -63,7 +63,7 @@ paths:
         500:
           description: Couldn't create model/servable
           content: {}
-  /jobs:
+  /visualization/jobs:
     post:
       tags:
       - Jobs
@@ -128,7 +128,7 @@ paths:
 
 
 
-  /params/{method}:
+  /visualization/params/{method}:
     post:
       tags:
       - params
@@ -155,6 +155,35 @@ paths:
         200:
           description: success
           content: {}
+
+  /visualization/supported:
+    get:
+      parameters:
+      - name: model_name
+        in: query
+        required: true
+        schema:
+          type: string
+      - name: model_version
+        in: query
+        required: true
+        schema:
+          type: integer
+      responses:
+        200:
+          description: Analyzed model
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  supported:
+                    type: boolean
+                  message:
+                    description: Explanation why not supported, if supported, then empty
+                    type: string
+
+
 
 components:
   schemas:
@@ -279,11 +308,15 @@ components:
         top_100:
           type: array
           items:
-            type: object
+            type: array
+            items:
+              type: integer
         counterfactuals:
           type: array
           items:
-            type: object
+            type: array
+            items:
+              type: integer
         visualization_metrics:
           type: object
           properties:
@@ -316,4 +349,5 @@ components:
       required:
       - state
       - task_id
+
 

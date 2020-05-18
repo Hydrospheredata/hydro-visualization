@@ -13,7 +13,7 @@ from loguru import logger as logging
 from conf import MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, DEBUG_ENV, \
     APP_PORT, HS_CLUSTER_ADDRESS, GRPC_PROXY_ADDRESS, EMBEDDING_FIELD
 from data_management import S3Manager, update_record, \
-    get_mongo_client
+    get_mongo_client, valid_embedding_model
 from data_management import get_record
 from ml_transformers.utils import AVAILABLE_TRANSFORMERS
 
@@ -214,17 +214,7 @@ def model_status():
     return jsonify(response), code
 
 
-def valid_embedding_model(model: Model) -> [bool]:
-    """
-    TODO add embedding field shape check
-    Check if model returns embeddings
-    :param model:
-    :return:
-    """
-    output_names = [field.name for field in model.contract.predict.outputs]
-    if EMBEDDING_FIELD not in output_names:
-        return False
-    return True
+
 
 
 if __name__ == "__main__":

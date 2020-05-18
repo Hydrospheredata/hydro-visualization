@@ -267,3 +267,15 @@ def get_production_subsample(model_id, size=1000) -> pd.DataFrame:
     if r.status_code != 200:
         return pd.DataFrame()
     return pd.DataFrame.from_dict(r.json())
+
+def valid_embedding_model(model: Model) -> [bool]:
+    """
+    TODO add embedding field shape check
+    Check if model returns embeddings
+    :param model:
+    :return:
+    """
+    output_names = [field.name for field in model.contract.predict.outputs]
+    if EMBEDDING_FIELD not in output_names:
+        return False
+    return True

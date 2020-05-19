@@ -139,7 +139,8 @@ def refit_model(method):
 
 
 @app.route(PREFIX + '/supported', methods=['GET'])
-def supported(model_version_id):
+def supported():
+    model_version_id = request.args.get('model_version_id')
     try:
         logging.info(f'Connecting to cluster')
         hs_cluster = Cluster(HS_CLUSTER_ADDRESS, grpc_address=GRPC_PROXY_ADDRESS)

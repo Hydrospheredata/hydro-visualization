@@ -139,17 +139,15 @@ def refit_model(method):
 
 
 @app.route(PREFIX + '/supported', methods=['GET'])
-def supported():
-    model_name = request.args.get('model_name')
-    model_version = int(request.args.get('model_version'))
+def supported(model_version_id):
     try:
         logging.info(f'Connecting to cluster')
         hs_cluster = Cluster(HS_CLUSTER_ADDRESS, grpc_address=GRPC_PROXY_ADDRESS)
-        model = Model.find(hs_cluster, model_name, int(model_version))
+        model = Model.find_by_id(hs_cluster, model_version_id)
     except ValueError as e:
-        return {"supported": False, "message": f"Unable to find {model_name}v{model_version}"}, 200
+        return {"supported": False, "message": f"Unable to find {model_version_id}"}, 200
     except Exception as e:
-        return {"supported": False, "message": f"Could not check if model is valid. Error: {e}"}, 200
+        return {"supported": False, "message": f"Could not check if model {model_version_id} is valid. Error: {e}"}, 200
 
     if valid_embedding_model(model):
         return {"supported": True, "message": "Model is supported"}, 200

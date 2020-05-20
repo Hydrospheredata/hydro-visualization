@@ -148,7 +148,7 @@ def supported():
     except ValueError as e:
         return {"supported": False, "message": f"Unable to find {model_version_id}"}, 200
     except Exception as e:
-        return {"supported": False, "message": f"Could not check if model {model_version_id} is valid. Error: {e}"}, 200
+        return {"supported": False, "message": f"Could not check if model {model_version_id} is valid"}, 200
 
     if valid_embedding_model(model):
         return {"supported": True, "message": "Model is supported"}, 200

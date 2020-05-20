@@ -144,7 +144,7 @@ def supported():
     try:
         logging.info(f'Connecting to cluster')
         hs_cluster = Cluster(HS_CLUSTER_ADDRESS, grpc_address=GRPC_PROXY_ADDRESS)
-        model = Model.find_by_id(hs_cluster, model_version_id)
+        model = Model.find_by_id(hs_cluster, int(model_version_id))
     except ValueError as e:
         return {"supported": False, "message": f"Unable to find {model_version_id}"}, 200
     except Exception as e:

@@ -15,7 +15,8 @@ from hydrosdk.servable import Servable
 from loguru import logger as logging
 from pymongo import MongoClient
 
-from conf import AWS_STORAGE_ENDPOINT, HS_CLUSTER_ADDRESS, HYDRO_VIS_BUCKET_NAME, EMBEDDING_FIELD
+from conf import AWS_STORAGE_ENDPOINT, HS_CLUSTER_ADDRESS, HYDRO_VIS_BUCKET_NAME, EMBEDDING_FIELD, \
+    N_NEIGHBOURS
 from ml_transformers.transformer import Transformer
 from ml_transformers.utils import DEFAULT_PARAMETERS, Coloring, get_top_N_neighbours
 
@@ -165,8 +166,8 @@ def parse_requests_dataframe(df, monitoring_fields: List[Tuple[str, str]], embed
         return coloring_info
 
     requests_ids = df['_id'].values.tolist()
-
-    top_N_neighbours = get_top_N_neighbours(embeddings, N=50)
+    N_neighbours = min(N_NEIGHBOURS + 1, len(embeddings) - 1)
+    top_N_neighbours = get_top_N_neighbours(embeddings, N=N_neighbours)
     counterfactuals = [[] for _ in range(len(top_N_neighbours))]
     predictions, confidence = [], []
     if 'class' in df.columns:

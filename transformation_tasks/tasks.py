@@ -14,7 +14,7 @@ from loguru import logger as logging
 
 from app import celery, s3manager
 from conf import MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, HYDRO_VIS_BUCKET_NAME, \
-    EMBEDDING_FIELD, HS_CLUSTER_ADDRESS, GRPC_PROXY_ADDRESS, TaskStates
+    EMBEDDING_FIELD, HS_CLUSTER_ADDRESS, GRPC_PROXY_ADDRESS, TaskStates, SUBSAMPLE_SIZE
 from data_management import get_record, parse_embeddings_from_dataframe, parse_requests_dataframe, \
     update_record, get_mongo_client, get_production_subsample, compute_training_embeddings, valid_embedding_model
 from visualizer import transform_high_dimensional
@@ -96,11 +96,11 @@ def transform_task(self, method, request_json):
             training_df = None
     else:
         training_df = None
-    production_requests_df = get_production_subsample(model.id, 200)
+    production_requests_df = get_production_subsample(model.id, SUBSAMPLE_SIZE)
 
     if production_requests_df.empty:
         self.update_state(state=TaskStates.NO_DATA,
-                          meta={'message': f'{model_name}v{model_version} model production data  is empty',
+                          meta={'message': f'{model_name}v{model_version} model has not enough production data.',
                                 'code': 404})
         raise Ignore()
     if EMBEDDING_FIELD not in production_requests_df.columns:

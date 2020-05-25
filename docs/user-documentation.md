@@ -40,6 +40,12 @@ Visualization also provides information about
 
 # Why do you need it? 
 
+Hydro visualization is a useful tool for general exploratory analysis of data – it can provide a unique lens through which to view data that can highlight structures and properties that are not seen when analysed with other methods.
+With provided visualizations you can become closer to understanding how model perceives production data:
+ - whether there are clear cluster boundaries for classes or not
+ - which classes are confused by model
+ - which points look like outliers and which are actually considered as outliers by monitoring model
+
 # How to use it
 
 

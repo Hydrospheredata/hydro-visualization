@@ -155,7 +155,7 @@ monitoring:
     config:
       monitoring-model: adult_scalar_monitoring_vis:1
       operator: <=
-      threshold:
+      threshold: 12
 ---
 kind: Application
 name: adult_scalar_vis

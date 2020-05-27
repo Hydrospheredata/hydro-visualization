@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 import requests
 import s3fs
-from hydrosdk.model import Model
+from hydrosdk.modelversion import ModelVersion
 from hydrosdk.servable import Servable
 from loguru import logger as logging
 from pymongo import MongoClient
@@ -237,7 +237,7 @@ def update_record(db, method, record, model_name, model_version):
                           {"$set": record}, upsert=True)
 
 
-def compute_training_embeddings(model: Model, servable: Servable, training_data: pd.DataFrame) -> Optional[np.ndarray]:
+def compute_training_embeddings(model: ModelVersion, servable: Servable, training_data: pd.DataFrame) -> Optional[np.ndarray]:
     """
     Computes embeddings from training data using unmonitorable servable
     :param model: model instance
@@ -269,7 +269,7 @@ def get_production_subsample(model_id, size=1000) -> pd.DataFrame:
         return pd.DataFrame()
     return pd.DataFrame.from_dict(r.json())
 
-def valid_embedding_model(model: Model) -> [bool]:
+def valid_embedding_model(model: ModelVersion) -> [bool]:
     """
     TODO add embedding field shape check
     Check if model returns embeddings

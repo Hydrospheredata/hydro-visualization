@@ -7,7 +7,7 @@ import pandas as pd
 import requests
 from celery.exceptions import Ignore
 from hydrosdk.cluster import Cluster
-from hydrosdk.model import Model
+from hydrosdk.modelversion import ModelVersion
 from hydrosdk.monitoring import MetricSpec
 from hydrosdk.servable import Servable
 from loguru import logger as logging
@@ -20,7 +20,7 @@ from data_management import get_record, parse_embeddings_from_dataframe, parse_r
 from visualizer import transform_high_dimensional
 
 
-def get_training_data_path(model: Model) -> str:
+def get_training_data_path(model: ModelVersion) -> str:
     """
 
     :param model:
@@ -64,7 +64,7 @@ def transform_task(self, method, request_json):
     try:
         logging.info(f'Connecting to cluster')
         hs_cluster = Cluster(HS_CLUSTER_ADDRESS, grpc_address=GRPC_PROXY_ADDRESS)
-        model = Model.find(hs_cluster, model_name, int(model_version))
+        model = ModelVersion.find(hs_cluster, model_name, int(model_version))
     except ValueError as e:
         self.update_state(state=TaskStates.ERROR,
                           meta={'message': f"Error: {e}", 'code': 404})

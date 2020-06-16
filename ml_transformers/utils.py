@@ -23,6 +23,34 @@ class Coloring(Enum):
     NONE = 'none'
 
 
+class VisMetrics(Enum):
+    global_score = 'global_score',
+    sammon_error = 'sammon_error',
+    auc_score = 'auc_score',
+    stability = 'stability',
+    msid = 'msid',
+    clustering = 'clustering'
+
+    @classmethod
+    def has_key(cls, name):
+        return any(x for x in cls if x.name == name)
+
+    @classmethod
+    def has_val(cls, value):
+        return any(x for x in cls if value in x.value)
+
+    @classmethod
+    def to_enum(cls, name):
+        for val in cls:
+            if val.name == name:
+                return val
+        return None
+
+
+AVAILBALE_VIS_METRICS = [VisMetrics.global_score, VisMetrics.sammon_error, VisMetrics.auc_score,
+                         VisMetrics.stability, VisMetrics.msid, VisMetrics.clustering]
+
+
 def get_top_N_neighbours(X, N=50) -> List[List[int]]:
     """
     Finds top 100 closest neighbours for each point
@@ -33,7 +61,7 @@ def get_top_N_neighbours(X, N=50) -> List[List[int]]:
     tree = cKDTree(X)
     top_100 = []
     for i in range(len(X)):
-        _, top = tree.query(X[i], k=N+1)
+        _, top = tree.query(X[i], k=N + 1)
         top = np.delete(top, np.where(top == i))
         top_100.append(top.tolist())
     logging.info(f'TOP 100 neighbour calculation took: {datetime.now() - start}')

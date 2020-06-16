@@ -11,7 +11,7 @@ from jsonschema import Draft7Validator
 from loguru import logger as logging
 
 from conf import MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, DEBUG_ENV, \
-    APP_PORT, HS_CLUSTER_ADDRESS, GRPC_PROXY_ADDRESS, EMBEDDING_FIELD
+    APP_PORT, HS_CLUSTER_ADDRESS, GRPC_PROXY_ADDRESS, EMBEDDING_FIELD, VisMetrics
 from data_management import S3Manager, update_record, \
     get_mongo_client, valid_embedding_model
 from data_management import get_record
@@ -90,8 +90,14 @@ def transform(method: str):
     :param method: umap /trimap /tsne
             request body: see README
             response body: see README
+    :param modelVersionId: int
     :return: task_id if not found
     """
+    if 'model_version_id' not in set(request.args.keys()):
+        return jsonify(
+            {"message": f"Expected args: 'model_version_id'. Provided args: {set(request.args.keys())}"}), 400
+    model_version_id = int(request.args.get('model_version_id'))
+
     if method not in AVAILABLE_TRANSFORMERS:
         return jsonify(
             {"message": f"Transformer method {method} is  not implemented."}), 400
@@ -103,19 +109,25 @@ def transform(method: str):
 
     logging.info(f'Received request: {request_json}')
 
-    result = transformation_tasks.tasks.transform_task.apply_async(args=(method, request_json), queue="visualization")
+    result = transformation_tasks.tasks.transform_task.apply_async(args=(method, model_version_id, request_json),
+                                                                   queue="visualization")
 
     return jsonify({
         'task_id': result.task_id}), 202
 
 
-@app.route(PREFIX + '/jobs/<method>', methods=['POST'])
+@app.route(PREFIX + '/jobs/<method>/', methods=['POST'])
 def refit_model(method):
     """
     Starts refitting transformer model
     :params model_id: model id int
     :return: job_id
     """
+    if 'model_version_id' not in set(request.args.keys()):
+        return jsonify(
+            {"message": f"Expected args: 'model_version_id'. Provided args: {set(request.args.keys())}"}), 400
+
+    model_version_id = int(request.args.get('model_version_id'))
     refit_transformer = request.args.get('refit_transformer', True)
 
     if method not in AVAILABLE_TRANSFORMERS:
@@ -126,13 +138,11 @@ def refit_model(method):
     if not validator.is_valid(request_json):
         error_message = "\n".join([error.message for error in validator.iter_errors(request_json)])
         return jsonify({"message": error_message}), 400
-    model_name = request_json.get('model_name')
-    model_version = str(request_json.get('model_version'))
-    db_model_info = get_record(db, method, model_name, model_version)
+    db_model_info = get_record(db, method, model_version_id)
     db_model_info['result_file'] = ''  # forget about old results
     if refit_transformer:
         db_model_info['transformer_file'] = ''
-    update_record(db, method, db_model_info, model_name, model_version)
+    update_record(db, method, db_model_info, model_version_id)
     result = transformation_tasks.tasks.transform_task.apply_async(args=(method, request_json), queue="visualization")
     return jsonify({
         'task_id': result.task_id}), 202
@@ -140,6 +150,10 @@ def refit_model(method):
 
 @app.route(PREFIX + '/supported', methods=['GET'])
 def supported():
+    if 'model_version_id' not in set(request.args.keys()):
+        return jsonify(
+            {"message": f"Expected args: 'model_version_id'. Provided args: {set(request.args.keys())}"}), 400
+
     model_version_id = request.args.get('model_version_id')
     try:
         logging.info(f'Connecting to cluster')
@@ -164,18 +178,22 @@ def set_params(method):
         request body: see README
     :return: 200
     """
+    if 'model_version_id' not in set(request.args.keys()):
+        return jsonify(
+            {"message": f"Expected args: 'model_version_id'. Provided args: {set(request.args.keys())}"}), 400
+
+    model_version_id = int(request.args.get('model_version_id'))
     logging.info("Received set params request")
     request_json = request.get_json()
-    model_name = request_json['model_name']
-    model_version = request_json['model_version']
     parameters = request_json['parameters']
     use_labels = request_json.get('use_label', False)
-    record = get_record(db, method, model_name, model_version)
+    visualization_metrics = request.get_data('visualization_metrics', [VisMetrics.GLOBAL_SCORE])
+    record = get_record(db, method, model_version_id)
     record['parameters'] = parameters
     record['use_labels'] = use_labels
     record['result_file'] = ''
     record['transformer_file'] = ''
-    update_record(db, method, record, model_name, model_version)
+    update_record(db, method, record, model_version_id)
     return jsonify({}), 200
 
 
@@ -186,6 +204,9 @@ def model_status():
     :param task_id:
     :return:
     """
+    if 'task_id' not in set(request.args.keys()):
+        return jsonify(
+            {"message": f"Expected args: 'task_id'. Provided args: {set(request.args.keys())}"}), 400
     task_id = request.args.get('task_id')
     task = transformation_tasks.tasks.transform_task.AsyncResult(task_id)
     response = {
@@ -211,9 +232,6 @@ def model_status():
         code = info['code']
 
     return jsonify(response), code
-
-
-
 
 
 if __name__ == "__main__":

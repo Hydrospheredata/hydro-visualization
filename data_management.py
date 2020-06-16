@@ -214,12 +214,10 @@ def parse_embeddings_from_dataframe(df):
     return embeddings
 
 
-def get_record(db, method, model_name, model_version) -> Dict:
-    existing_record = db[method].find_one({"model_name": model_name,
-                                           "model_version": model_version})
+def get_record(db, method, model_version_id) -> Dict:
+    existing_record = db[method].find_one({"model_version_id": str(model_version_id)})
     if not existing_record:
-        return {"model_name": model_name,
-                "model_version": model_version,
+        return {"model_version_id": model_version_id,
                 "result_file": "",
                 "transformer_file": "",
                 "parameters": DEFAULT_PARAMETERS[method],
@@ -228,12 +226,11 @@ def get_record(db, method, model_name, model_version) -> Dict:
         return existing_record
 
 
-def update_record(db, method, record, model_name, model_version):
-    model_version = str(model_version)
+def update_record(db, method, record, model_version_id):
+    model_version_id = str(model_version_id)
     if '_id' in record:
         del record['_id']
-    db[method].update_one({"model_name": model_name,
-                           "model_version": model_version},
+    db[method].update_one({"model_version_id": model_version_id},
                           {"$set": record}, upsert=True)
 
 

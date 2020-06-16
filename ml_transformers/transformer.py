@@ -1,7 +1,7 @@
 import warnings
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Dict
+from typing import Dict, Tuple
 
 import numpy as np
 from loguru import logger as logging
@@ -9,7 +9,7 @@ from umap import UMAP
 
 from .metrics import global_score, sammon_error, stability_score, auc_score, intristic_multiscale_score, \
     clustering_score
-from .utils import DEFAULT_PARAMETERS
+from .utils import DEFAULT_PARAMETERS, VisMetrics, AVAILBALE_VIS_METRICS
 
 
 class Transformer(ABC):
@@ -38,8 +38,7 @@ class Transformer(ABC):
         return None
 
     def eval(self, X: np.ndarray, _X: np.ndarray, y=None,
-             evaluation_metrics=("global_score", "sammon_error",
-                                 "auc_score", "stability_score", "msid", "clustering"),
+             evaluation_metrics: Tuple[VisMetrics] = tuple(AVAILBALE_VIS_METRICS),
              _auc_cv=5) -> Dict[str, str]:
         """
         Evaluates vizualization using listed evaluation_metrics names
@@ -52,22 +51,21 @@ class Transformer(ABC):
         """
         start = datetime.now()
         eval_metrics = {}
-        if 'global_score' in evaluation_metrics:
-            eval_metrics['global_score'] = str(global_score(X, _X))
-        if 'sammon_error' in evaluation_metrics:
-
-            eval_metrics['sammon_error'] = str(sammon_error(X, _X))
-        if 'auc_score' in evaluation_metrics and y is not None:
+        if VisMetrics.global_score in evaluation_metrics:
+            eval_metrics[VisMetrics.global_score.name] = str(global_score(X, _X))
+        if VisMetrics.sammon_error in evaluation_metrics:
+            eval_metrics[VisMetrics.sammon_error.name] = str(sammon_error(X, _X))
+        if VisMetrics.auc_score in evaluation_metrics and y is not None:
             acc_result = auc_score(_X, y)
-            eval_metrics['knn_acc'] = str(acc_result['knn_acc'])
+            eval_metrics['knn_acc'] = str(acc_result['knn_acc'])  # TODO
             eval_metrics['svc_acc'] = str(acc_result['svc_acc'])
-        if 'stability_score' in evaluation_metrics:
-            eval_metrics['stability'] = str(stability_score(X, self.__instance__))
-        if 'msid' in evaluation_metrics:
-            eval_metrics['msid'] = str(intristic_multiscale_score(X, _X))
-        if 'clustering' in evaluation_metrics and y is not None:
+        if VisMetrics.stability in evaluation_metrics:
+            eval_metrics[VisMetrics.stability.name] = str(stability_score(X, self.__instance__))
+        if VisMetrics.msid in evaluation_metrics:
+            eval_metrics[VisMetrics.msid.name] = str(intristic_multiscale_score(X, _X))
+        if VisMetrics.clustering in evaluation_metrics and y is not None:
             ars, ami = clustering_score(_X, y)
-            eval_metrics['clustering_random_score'] = str(ars)
+            eval_metrics['clustering_random_score'] = str(ars)  # TODO
             eval_metrics['clustering_mutual_info'] = str(ami)
         logging.info(f'Evaluation of embeddings took {datetime.now() - start}')
         return eval_metrics

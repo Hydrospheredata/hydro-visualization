@@ -1,5 +1,6 @@
 import json
 import sys
+from typing import List
 
 import git
 from celery import Celery
@@ -11,11 +12,11 @@ from jsonschema import Draft7Validator
 from loguru import logger as logging
 
 from conf import MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, DEBUG_ENV, \
-    APP_PORT, HS_CLUSTER_ADDRESS, GRPC_PROXY_ADDRESS, EMBEDDING_FIELD, VisMetrics
+    APP_PORT, HS_CLUSTER_ADDRESS, GRPC_PROXY_ADDRESS, EMBEDDING_FIELD
 from data_management import S3Manager, update_record, \
     get_mongo_client, valid_embedding_model
 from data_management import get_record
-from ml_transformers.utils import AVAILABLE_TRANSFORMERS
+from ml_transformers.utils import AVAILABLE_TRANSFORMERS, VisMetrics, DEFAULT_PARAMETERS
 
 with open("version") as f:
     VERSION = f.read().strip()
@@ -102,21 +103,14 @@ def transform(method: str):
         return jsonify(
             {"message": f"Transformer method {method} is  not implemented."}), 400
 
-    request_json = request.get_json()
-    if not validator.is_valid(request_json):
-        error_message = "\n".join([error.message for error in validator.iter_errors(request_json)])
-        return jsonify({"message": error_message}), 400
-
-    logging.info(f'Received request: {request_json}')
-
-    result = transformation_tasks.tasks.transform_task.apply_async(args=(method, model_version_id, request_json),
+    result = transformation_tasks.tasks.transform_task.apply_async(args=(method, model_version_id),
                                                                    queue="visualization")
 
     return jsonify({
         'task_id': result.task_id}), 202
 
 
-@app.route(PREFIX + '/jobs/<method>/', methods=['POST'])
+@app.route(PREFIX + '/jobs/<method>', methods=['POST'])
 def refit_model(method):
     """
     Starts refitting transformer model
@@ -134,16 +128,13 @@ def refit_model(method):
         return jsonify(
             {"message": f"Transformer method {method} is  not implemented."}), 400
 
-    request_json = request.get_json()
-    if not validator.is_valid(request_json):
-        error_message = "\n".join([error.message for error in validator.iter_errors(request_json)])
-        return jsonify({"message": error_message}), 400
+
     db_model_info = get_record(db, method, model_version_id)
     db_model_info['result_file'] = ''  # forget about old results
     if refit_transformer:
         db_model_info['transformer_file'] = ''
     update_record(db, method, db_model_info, model_version_id)
-    result = transformation_tasks.tasks.transform_task.apply_async(args=(method, request_json), queue="visualization")
+    result = transformation_tasks.tasks.transform_task.apply_async(args=(method, model_version_id), queue="visualization")
     return jsonify({
         'task_id': result.task_id}), 202
 
@@ -170,6 +161,7 @@ def supported():
         return {"supported": False, "message": f"No '{EMBEDDING_FIELD}' field in model output fields"}, 200
 
 
+# TODO add get_params
 @app.route(PREFIX + '/params/<method>', methods=['POST'])
 def set_params(method):
     """
@@ -182,19 +174,33 @@ def set_params(method):
         return jsonify(
             {"message": f"Expected args: 'model_version_id'. Provided args: {set(request.args.keys())}"}), 400
 
+    # TODO validate jsons
     model_version_id = int(request.args.get('model_version_id'))
     logging.info("Received set params request")
     request_json = request.get_json()
     parameters = request_json['parameters']
     use_labels = request_json.get('use_label', False)
-    visualization_metrics = request.get_data('visualization_metrics', [VisMetrics.GLOBAL_SCORE])
+    visualization_metrics: List[str] = request_json.get('visualization_metrics', [VisMetrics.global_score.name])
     record = get_record(db, method, model_version_id)
     record['parameters'] = parameters
     record['use_labels'] = use_labels
     record['result_file'] = ''
     record['transformer_file'] = ''
+    record['visualization_metrics'] = visualization_metrics
     update_record(db, method, record, model_version_id)
     return jsonify({}), 200
+
+
+@app.route(PREFIX + '/params/<method>', methods=['GET'])
+def get_params(method):
+    if 'model_version_id' not in set(request.args.keys()):
+        return jsonify(
+            {"message": f"Expected args: 'model_version_id'. Provided args: {set(request.args.keys())}"}), 400
+    model_version_id = int(request.args.get('model_version_id'))
+    record = get_record(db, method, str(model_version_id))
+    parameters = record.get('parameters', DEFAULT_PARAMETERS[method])  # TODO return 400 if such model does not exist
+    vis_metrics: List[str] = record.get('visualization_metrics', [VisMetrics.global_score.name])
+    return jsonify({'parameters': parameters, 'visualization_metrics': vis_metrics}), 200
 
 
 @app.route(PREFIX + '/jobs', methods=['GET'])

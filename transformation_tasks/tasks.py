@@ -1,6 +1,7 @@
 import json
 import sys
 from datetime import datetime
+from typing import List
 
 import hydro_serving_grpc as hs_grpc
 import pandas as pd
@@ -17,7 +18,8 @@ from conf import MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, H
     EMBEDDING_FIELD, HS_CLUSTER_ADDRESS, GRPC_PROXY_ADDRESS, TaskStates, SUBSAMPLE_SIZE
 from data_management import get_record, parse_embeddings_from_dataframe, parse_requests_dataframe, \
     update_record, get_mongo_client, get_production_subsample, compute_training_embeddings, valid_embedding_model
-from visualizer import transform_high_dimensional
+from ml_transformers.transformer import transform_high_dimensional
+from ml_transformers.utils import VisMetrics
 
 
 def get_training_data_path(model: ModelVersion) -> str:
@@ -40,20 +42,21 @@ def get_production_data_sample(model_id, sample_size=1000) -> pd.DataFrame:
 
 
 @celery.task(bind=True, track_started=True)
-def transform_task(self, method, model_version_id, request_json):
+def transform_task(self, method, model_version_id):
     start = datetime.now()
     mongo_client = get_mongo_client(MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB)
     db = mongo_client['visualization']
 
-    vis_metrics = request_json.get('visualization_metrics', {})
-
-    s3_model_path = f's3://{HYDRO_VIS_BUCKET_NAME}/{model_version_id}' # TODO make management of S3 bucket storage to check if model in storage is correct
+    s3_model_path = f's3://{HYDRO_VIS_BUCKET_NAME}/{model_version_id}'  # TODO make management of S3 bucket storage to check if model in storage is correct
     s3manager.fs.mkdirs(s3_model_path, exist_ok=True)
 
     db_model_info = get_record(db, method, model_version_id)
     parameters = db_model_info.get('parameters', {})
     path_to_transformer = db_model_info.get('transformer_file', '')
     result_path = db_model_info.get('result_file', '')
+    vis_metrics: List[str] = db_model_info.get('visualization_metrics', [VisMetrics.global_score.name])
+    vis_metrics: List[VisMetrics] = [VisMetrics.to_enum(metric_name) for metric_name in vis_metrics]
+
     if result_path:
         plottable_data = s3manager.read_json(filepath=result_path)
         if plottable_data:

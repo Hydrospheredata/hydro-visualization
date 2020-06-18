@@ -36,16 +36,7 @@ Whole API description is available [here](openapi.yaml)
 1.**POST** /visualization/plottable_embeddings/umap?model_version_id=2
     
     transformer - manifold learning transformer from ["umap", "trimap", "tsne"]. For now only ["umap"].
-  
-   request json:   
-```json
-{        "model_name": "adult_scalar",
-         "model_version": 1,
-         "visualization_metrics": ["global_score", "sammon_error", "auc_score", "stability_score", "msid", "clustering"]
-}
  
- 
-```
 
   response json:
 ```json
@@ -153,69 +144,6 @@ Returns state of a task and result if ready
 
     ```
 
-    **Projector params**:
-    
-    ```json
-    {
-     "properties": {
-                "metric": {
-                    "type": "string",
-                    "default": "euclidean",
-                    "enum": [ "euclidean", "manhattan", "chebyshev", "minkowski", "canberra", "braycurtis", "haversine", 
-                               "mahalanobis", "wminkowski", "seuclidean", "cosine", "correlation", "hamming", "jaccard",
-                                "dice", "russellrao", "kulsinski", "rogerstanimoto", "sokalmichener", "sokalsneath", "yule"]
-                },
-                "min_dist": {
-                    "type": "number",
-                    "default": 0.1,
-                    "examples": [
-                        0.1
-                    ],
-                    "maximum": 0.99,
-                    "minimum": 0.0
-                },
-                "n_components": {
-                    "type": "integer",
-                    "default": 2,
-                    "examples": [
-                        2
-                    ],
-                    "maximum": 3,
-                    "minimum": 2
-                },
-                "n_neighbours": {
-                    "type": "integer",
-                    "default": 15,
-                    "examples": [
-                        15
-                    ],
-                    "maximum": 200,
-                    "minimum": 2
-                },
-     "production_data_sample_size": {
-            "type": "integer",
-            "default": 500,
-            "examples": [
-                500
-            ],
-            "maximum": 5000,
-            "minimum": 20
-        },
-        "training_data_sample_size": {
-            "type": "integer",
-            "default": 5000,
-            "examples": [
-                5000
-            ],
-            "maximum": 10000,
-            "minimum": 20
-        },
-        "visualization_metrics": {
-            "type": "array",
-            "default": ["global_score"],
-            "enum": ["global_score", "sammon_error", "auc_score", "stability_score", "msid", "clustering"]
-    }
-    ```
 
 4. **GET** /visualization/supported?model_version_id=2
 
@@ -226,22 +154,76 @@ Returns state of a task and result if ready
     {"supported": false, "message":"Some message"}, 200
     ```
 
+## **Projector params**:
+    
+```json
+{
+ "properties": {
+            "metric": {
+                "type": "string",
+                "default": "euclidean",
+                "enum": [ "euclidean", "manhattan", "chebyshev", "minkowski", "canberra", "braycurtis", "haversine", 
+                           "mahalanobis", "wminkowski", "seuclidean", "cosine", "correlation", "hamming", "jaccard",
+                            "dice", "russellrao", "kulsinski", "rogerstanimoto", "sokalmichener", "sokalsneath", "yule"]
+            },
+            "min_dist": {
+                "type": "number",
+                "default": 0.1,
+                "examples": [
+                    0.1
+                ],
+                "maximum": 0.99,
+                "minimum": 0.0
+            },
+            "n_components": {
+                "type": "integer",
+                "default": 2,
+                "examples": [
+                    2
+                ],
+                "maximum": 3,
+                "minimum": 2
+            },
+            "n_neighbours": {
+                "type": "integer",
+                "default": 15,
+                "examples": [
+                    15
+                ],
+                "maximum": 200,
+                "minimum": 2
+            },
+ "production_data_sample_size": {
+        "type": "integer",
+        "default": 500,
+        "examples": [
+            500
+        ],
+        "maximum": 5000,
+        "minimum": 20
+    },
+    "training_data_sample_size": {
+        "type": "integer",
+        "default": 5000,
+        "examples": [
+            5000
+        ],
+        "maximum": 10000,
+        "minimum": 20
+    },
+    "visualization_metrics": {
+        "type": "array",
+        "default": ["global_score"],
+        "enum": ["global_score", "sammon_error", "auc_score", "stability_score", "msid", "clustering"]
+}
+```
 
 ## Demo
 1. set environment variables: AWS_ACCESS_KEY, AWS_SECRET_KEY
 2. upload demo/adult/model and demo/adult/monitoring_model
 2. send request 
 
-POST /visualization/plottable_embeddings/umap
-
-```json
-{        "model_name": "adult_scalar",
-         "model_version": 7,
-         "visualization_metrics": ["global_score", "sammon_error", "auc_score", "stability_score", "msid", "clustering"]
-}
- 
- 
-```
+POST /visualization/plottable_embeddings/umap?model_version_id=2
 
 ### Database schema 
 
@@ -252,16 +234,21 @@ collection: umap, trimap, tsne
 
 ```json
 {
-"model_name": "adult_scalar",
-"model_version": "1",
+"model_version_id": "2",
 "result_file": "s3://hydro-vis/adult_scalar/2/result.json",
 "transformer_file": "s3://hydro-vis/adult_scalar/2/umap_transformer",
-"parameters": {"n_neighbours": 15,
-                  "min_dist": 0.1,
-                  "metric":  "cosine"},
-"use_labels": false
+"parameters": {
+        "metric": "euclidean",
+        "min_dist": 0.1,
+        "n_components": 2,
+        "n_neighbours": 15
+      },
+"production_data_sample_size": 500,
+"training_data_sample_size": 5000,
+"visualization_metrics": ["global_score"]
 }
 ```
+
 transformed_embeddings - files that store transformed embeddings with labels and other monitoring numbers
 
 transformer structure

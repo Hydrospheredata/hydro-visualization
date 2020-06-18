@@ -154,7 +154,6 @@ def transform_task(self, method, model_version_id):
                                                              transformer,
                                                              vis_metrics=vis_metrics)
     plottable_data.update(requests_data_dict)
-    plottable_data["parameters"] = parameters
 
     result_path = s3_model_path + '/result.json'
     try:

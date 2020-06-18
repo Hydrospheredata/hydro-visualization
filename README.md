@@ -33,8 +33,7 @@ HYDRO_VIS_BUCKET_NAME = os.getenv('BUCKET_NAME', 'hydro-vis')
 
 Whole API description is available [here](openapi.yaml)
 
-1.**POST** /visualization/plottable_embeddings/<method>
-
+1.**POST** /visualization/plottable_embeddings/umap?model_version_id=2
     
     transformer - manifold learning transformer from ["umap", "trimap", "tsne"]. For now only ["umap"].
   
@@ -53,15 +52,8 @@ Whole API description is available [here](openapi.yaml)
 {"task_id":  "22e86484-7d90-49fd-a3e1-329b978ee18c"}
 ```
 
-2. **POST** /visualization/jobs/<method>
+2. **POST** /visualization/jobs/<method>?model_version_id=2
 
-    request_json:
-```json
-{        "model_name": "adult_scalar",
-         "model_version": 1,
-         "visualization_metrics": ["global_score", "sammon_error", "auc_score", "stability_score", "msid", "clustering"]
-}
-```
 
   response json:
 ```json
@@ -114,33 +106,58 @@ Returns state of a task and result if ready
 }
 ```
 
-2. **POST** /visualization/params/<method>
+2. **POST** /visualization/params/<method>?model_version_id=2
   
     **request format**:
     ```json
-   {
-   "model_name": "efficientnet",
-   "model_version": 12,
-   "parameters": {"n_neighbours": 15,
-                  "min_dist": 0.1,
-                  "metric":  "cosine"},
-   "use_labels": "true"
+     {
+        "parameters": {
+        "metric": "euclidean",
+        "min_dist": 0.1,
+        "n_components": 2,
+        "n_neighbours": 15
+      },
+       "production_data_sample_size": 500,
+       "training_data_sample_size": 5000,
+       "visualization_metrics": [
+         "global_score"
+      ]
     }
+
     ```
+
    
    - parameters: dict of transfomer parameters. Different set of parameters for different transformer used.
-   - use_labels: true if use ground truth labels from training data. Predicted labels from production data is not
-   used because this will generate false map. 
+. 
    
     **response**:
     200 - Success
-    
 
-3. **GET** /visualization/supported?model_name=adult_scalar_test&model_version=1
+3. **GET** /visualization/params/<method>?model_version_id=2
 
-   
+    **response format**:
+    ```json
+     {
+        "parameters": {
+        "metric": "euclidean",
+        "min_dist": 0.1,
+        "n_components": 2,
+        "n_neighbours": 15
+      },
+       "production_data_sample_size": 500,
+       "training_data_sample_size": 5000,
+       "visualization_metrics": [
+         "global_score"
+      ]
+    }
+
     ```
-   **response**
+
+
+4. **GET** /visualization/supported?model_version_id=2
+
+   **response**:
+   
    ```json
     {"supported": true, "message":""}, 200
     {"supported": false, "message":"Some message"}, 200

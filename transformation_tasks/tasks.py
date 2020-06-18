@@ -15,11 +15,11 @@ from loguru import logger as logging
 
 from app import celery, s3manager
 from conf import MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, HYDRO_VIS_BUCKET_NAME, \
-    EMBEDDING_FIELD, HS_CLUSTER_ADDRESS, GRPC_PROXY_ADDRESS, TaskStates, SUBSAMPLE_SIZE
+    EMBEDDING_FIELD, HS_CLUSTER_ADDRESS, GRPC_PROXY_ADDRESS, TaskStates
 from data_management import get_record, parse_embeddings_from_dataframe, parse_requests_dataframe, \
     update_record, get_mongo_client, get_production_subsample, compute_training_embeddings, valid_embedding_model
 from ml_transformers.transformer import transform_high_dimensional
-from ml_transformers.utils import VisMetrics
+from ml_transformers.utils import VisMetrics, DEFAULT_PROJECTION_PARAMETERS
 
 
 def get_training_data_path(model: ModelVersion) -> str:
@@ -54,9 +54,14 @@ def transform_task(self, method, model_version_id):
     parameters = db_model_info.get('parameters', {})
     path_to_transformer = db_model_info.get('transformer_file', '')
     result_path = db_model_info.get('result_file', '')
-    vis_metrics: List[str] = db_model_info.get('visualization_metrics', [VisMetrics.global_score.name])
+    vis_metrics: List[str] = db_model_info.get('visualization_metrics',
+                                               DEFAULT_PROJECTION_PARAMETERS['visualization_metrics'])
     vis_metrics: List[VisMetrics] = [VisMetrics.to_enum(metric_name) for metric_name in vis_metrics]
+    training_data_sample_size = db_model_info.get('training_data_sample_size',
+                                                  DEFAULT_PROJECTION_PARAMETERS['training_data_sample_size'])
 
+    production_data_sample_size = db_model_info.get('production_data_sample_size',
+                                                    DEFAULT_PROJECTION_PARAMETERS['production_data_sample_size'])
     if result_path:
         plottable_data = s3manager.read_json(filepath=result_path)
         if plottable_data:
@@ -99,7 +104,7 @@ def transform_task(self, method, model_version_id):
             training_df = None
     else:
         training_df = None
-    production_requests_df = get_production_subsample(model.id, SUBSAMPLE_SIZE)
+    production_requests_df = get_production_subsample(model.id, production_data_sample_size)
 
     if production_requests_df.empty:
         self.update_state(state=TaskStates.NO_DATA,
@@ -139,7 +144,9 @@ def transform_task(self, method, model_version_id):
             logging.error(f"Couldn't create {model_name}v{model_version} servable. Error:{e}")
             training_embeddings = None
         else:
-            training_embeddings = compute_training_embeddings(model, servable, training_df)
+            training_data_sample_size = min(training_data_sample_size, len(training_df))
+            training_df_sample = training_df.sample(training_data_sample_size)
+            training_embeddings = compute_training_embeddings(model, servable, training_df_sample)
             Servable.delete(hs_cluster, servable.name)
 
     plottable_data, transformer = transform_high_dimensional(method, parameters,

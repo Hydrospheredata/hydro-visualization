@@ -10,7 +10,7 @@ from umap import UMAP
 
 from .metrics import global_score, sammon_error, stability_score, auc_score, intristic_multiscale_score, \
     clustering_score
-from .utils import DEFAULT_PARAMETERS, VisMetrics, AVAILBALE_VIS_METRICS
+from .utils import DEFAULT_TRANSFORMER_PARAMETERS, VisMetrics, AVAILBALE_VIS_METRICS
 
 
 class Transformer(ABC):
@@ -74,7 +74,7 @@ class Transformer(ABC):
 
 class UmapTransformer(Transformer):
     def __init__(self, parameters):
-        self.default_parameters = DEFAULT_PARAMETERS['umap']
+        self.default_parameters = DEFAULT_TRANSFORMER_PARAMETERS['umap']
         super().__init__(parameters)
         self.embedding_ = None
 
@@ -139,7 +139,6 @@ def transform_high_dimensional(method, parameters,
     :param vis_metrics:
     :return: (embedding dict, transformer)
     """
-    logging.info('Transform high dimensional')
     result = {}
     transformer = None
     need_fit = True
@@ -153,36 +152,33 @@ def transform_high_dimensional(method, parameters,
     if transformer is None:
         logger.error('Cannot define transformer. Illegal method name')
 
-    training_embeddings = training_embeddings
     if training_embeddings is not None and production_embeddings is not None:
-        training_embeddings_sample_size = min(5000, training_embeddings.shape[0])
-        training_embeddings = training_embeddings[
-            np.random.choice(training_embeddings.shape[0], training_embeddings_sample_size, replace=False)]
         total_embeddings = np.concatenate([production_embeddings, training_embeddings])
     else:
-        total_embeddings = production_embeddings
+        total_embeddings = production_embeddings  # 100
 
     start = datetime.now()
     if not need_fit and method == 'umap':
-        plottable_embeddings = transformer.transform(production_embeddings)
+        plottable_embeddings = transformer.transform(total_embeddings)
     else:
         plottable_embeddings = transformer.fit_transform(
             total_embeddings)  # TODO add ground truth labels management for semi-supervised umap
-
     logger.info(
         f'Fitting {total_embeddings.shape[0]} {total_embeddings.shape[1]}-dimensional points took '
         f'{datetime.now() - start}')
 
-    vis_eval_metrics = transformer.eval(total_embeddings[:len(plottable_embeddings)], plottable_embeddings,
+    vis_eval_metrics = transformer.eval(total_embeddings, plottable_embeddings,
                                         y=None,
                                         evaluation_metrics=vis_metrics)  # TODO add ground truth_labels
 
-    plottable_embeddings = plottable_embeddings[:len(production_embeddings)]  # Slice excessive ?
-
-    result['data_shape'] = plottable_embeddings.shape
-    result['data'] = plottable_embeddings.tolist()
+    plottable_training_embeddings = plottable_embeddings[len(production_embeddings):]
+    plottable_prod_embeddings = plottable_embeddings[:len(production_embeddings)]
+    result['data_shape'] =  plottable_prod_embeddings.shape
+    result['data'] =  plottable_prod_embeddings.tolist()
     result['visualization_metrics'] = vis_eval_metrics
-
+    if len(plottable_training_embeddings) > 0:
+        result['training_data'] = plottable_training_embeddings.tolist()
+        result['training_data_shape'] = plottable_training_embeddings.shape
     transformer.embedding_ = None  # ?
 
     return result, transformer

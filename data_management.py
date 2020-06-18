@@ -18,7 +18,8 @@ from pymongo import MongoClient
 from conf import AWS_STORAGE_ENDPOINT, HS_CLUSTER_ADDRESS, HYDRO_VIS_BUCKET_NAME, EMBEDDING_FIELD, \
     N_NEIGHBOURS
 from ml_transformers.transformer import Transformer
-from ml_transformers.utils import DEFAULT_PARAMETERS, Coloring, get_top_N_neighbours, VisMetrics
+from ml_transformers.utils import DEFAULT_TRANSFORMER_PARAMETERS, Coloring, get_top_N_neighbours, \
+    DEFAULT_PROJECTION_PARAMETERS
 
 
 def get_mongo_client(mongo_url, mongo_port, mongo_user, mongo_pass, mongo_auth_db):
@@ -221,9 +222,10 @@ def get_record(db, method, model_version_id: str) -> Dict:
         return {"model_version_id": model_version_id,
                 "result_file": "",
                 "transformer_file": "",
-                "parameters": DEFAULT_PARAMETERS[method],
-                "use_labels": False,
-                "visualization_metrics": [VisMetrics.global_score.name]}
+                "parameters": DEFAULT_TRANSFORMER_PARAMETERS[method],
+                "visualization_metrics": DEFAULT_PROJECTION_PARAMETERS['visualization_metrics'],
+                "production_data_sample_size": DEFAULT_PROJECTION_PARAMETERS['production_data_sample_size'],
+                "training_data_sample_size": DEFAULT_PROJECTION_PARAMETERS['training_data_sample_size']}
     else:
         return existing_record
 

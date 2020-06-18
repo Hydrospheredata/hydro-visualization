@@ -6,16 +6,6 @@ import numpy as np
 from loguru import logger as logging
 from scipy.spatial import cKDTree
 
-AVAILABLE_TRANSFORMERS = {'umap'}  # {'umap', 'tsne', 'trimap'}
-
-UMAP_N_NEIGHBOURS = 15
-UMAP_MIN_DIST = 0.1
-UMAP_METRIC = 'euclidean'
-
-DEFAULT_PARAMETERS = {'umap':
-                          {'min_dist': 0.1, 'n_neighbours': 15, 'metric': 'euclidean', 'n_components': 2}
-                      }
-
 
 class Coloring(Enum):
     CLASS = 'class'
@@ -47,8 +37,18 @@ class VisMetrics(Enum):
         return None
 
 
-AVAILBALE_VIS_METRICS = [VisMetrics.global_score, VisMetrics.sammon_error, VisMetrics.auc_score,
-                         VisMetrics.stability, VisMetrics.msid, VisMetrics.clustering]
+AVAILBALE_VIS_METRICS = list(VisMetrics)
+
+AVAILABLE_TRANSFORMERS = {'umap'}  # {'umap', 'tsne', 'trimap'}
+DEFAULT_TRANSFORMER_PARAMETERS = {'umap':
+                                      {'min_dist': 0.1, 'n_neighbours': 15, 'metric': 'euclidean', 'n_components': 2}
+                                  }
+
+DEFAULT_PROJECTION_PARAMETERS = {'parameters': DEFAULT_TRANSFORMER_PARAMETERS,
+                                 'use_labels': False,
+                                 'visualization_metrics': [VisMetrics.global_score.name],
+                                 'training_data_sample_size': 5000,
+                                 'production_data_sample_size': 500}
 
 
 def get_top_N_neighbours(X, N=50) -> List[List[int]]:

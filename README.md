@@ -153,6 +153,69 @@ Returns state of a task and result if ready
 
     ```
 
+    **Projector params**:
+    
+    ```json
+    {
+     "properties": {
+                "metric": {
+                    "type": "string",
+                    "default": "euclidean",
+                    "enum": [ "euclidean", "manhattan", "chebyshev", "minkowski", "canberra", "braycurtis", "haversine", 
+                               "mahalanobis", "wminkowski", "seuclidean", "cosine", "correlation", "hamming", "jaccard",
+                                "dice", "russellrao", "kulsinski", "rogerstanimoto", "sokalmichener", "sokalsneath", "yule"]
+                },
+                "min_dist": {
+                    "type": "number",
+                    "default": 0.1,
+                    "examples": [
+                        0.1
+                    ],
+                    "maximum": 0.99,
+                    "minimum": 0.0
+                },
+                "n_components": {
+                    "type": "integer",
+                    "default": 2,
+                    "examples": [
+                        2
+                    ],
+                    "maximum": 3,
+                    "minimum": 2
+                },
+                "n_neighbours": {
+                    "type": "integer",
+                    "default": 15,
+                    "examples": [
+                        15
+                    ],
+                    "maximum": 200,
+                    "minimum": 2
+                },
+     "production_data_sample_size": {
+            "type": "integer",
+            "default": 500,
+            "examples": [
+                500
+            ],
+            "maximum": 5000,
+            "minimum": 20
+        },
+        "training_data_sample_size": {
+            "type": "integer",
+            "default": 5000,
+            "examples": [
+                5000
+            ],
+            "maximum": 10000,
+            "minimum": 20
+        },
+        "visualization_metrics": {
+            "type": "array",
+            "default": ["global_score"],
+            "enum": ["global_score", "sammon_error", "auc_score", "stability_score", "msid", "clustering"]
+    }
+    ```
 
 4. **GET** /visualization/supported?model_version_id=2
 

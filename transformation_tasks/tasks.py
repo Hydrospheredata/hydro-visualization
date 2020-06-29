@@ -1,6 +1,7 @@
 import json
 import sys
 from datetime import datetime
+from typing import List
 
 import hydro_serving_grpc as hs_grpc
 import pandas as pd
@@ -14,10 +15,11 @@ from loguru import logger as logging
 
 from app import celery, s3manager
 from conf import MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, HYDRO_VIS_BUCKET_NAME, \
-    EMBEDDING_FIELD, HS_CLUSTER_ADDRESS, GRPC_PROXY_ADDRESS, TaskStates, SUBSAMPLE_SIZE
+    EMBEDDING_FIELD, HS_CLUSTER_ADDRESS, GRPC_PROXY_ADDRESS, TaskStates
 from data_management import get_record, parse_embeddings_from_dataframe, parse_requests_dataframe, \
     update_record, get_mongo_client, get_production_subsample, compute_training_embeddings, valid_embedding_model
-from visualizer import transform_high_dimensional
+from ml_transformers.transformer import transform_high_dimensional
+from ml_transformers.utils import VisMetrics, DEFAULT_PROJECTION_PARAMETERS
 
 
 def get_training_data_path(model: ModelVersion) -> str:
@@ -40,22 +42,26 @@ def get_production_data_sample(model_id, sample_size=1000) -> pd.DataFrame:
 
 
 @celery.task(bind=True, track_started=True)
-def transform_task(self, method, request_json):
+def transform_task(self, method, model_version_id):
     start = datetime.now()
     mongo_client = get_mongo_client(MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB)
     db = mongo_client['visualization']
 
-    model_name = request_json.get('model_name')
-    model_version = str(request_json.get('model_version'))
-    vis_metrics = request_json.get('visualization_metrics', {})
-
-    s3_model_path = f's3://{HYDRO_VIS_BUCKET_NAME}/{model_name}/{model_version}'
+    s3_model_path = f's3://{HYDRO_VIS_BUCKET_NAME}/{model_version_id}'  # TODO make management of S3 bucket storage to check if model in storage is correct
     s3manager.fs.mkdirs(s3_model_path, exist_ok=True)
 
-    db_model_info = get_record(db, method, model_name, str(model_version))
+    db_model_info = get_record(db, method, model_version_id)
     parameters = db_model_info.get('parameters', {})
     path_to_transformer = db_model_info.get('transformer_file', '')
     result_path = db_model_info.get('result_file', '')
+    vis_metrics: List[str] = db_model_info.get('visualization_metrics',
+                                               DEFAULT_PROJECTION_PARAMETERS['visualization_metrics'])
+    vis_metrics: List[VisMetrics] = [VisMetrics.to_enum(metric_name) for metric_name in vis_metrics]
+    training_data_sample_size = db_model_info.get('training_data_sample_size',
+                                                  DEFAULT_PROJECTION_PARAMETERS['training_data_sample_size'])
+
+    production_data_sample_size = db_model_info.get('production_data_sample_size',
+                                                    DEFAULT_PROJECTION_PARAMETERS['production_data_sample_size'])
     if result_path:
         plottable_data = s3manager.read_json(filepath=result_path)
         if plottable_data:
@@ -64,7 +70,9 @@ def transform_task(self, method, request_json):
     try:
         logging.info(f'Connecting to cluster')
         hs_cluster = Cluster(HS_CLUSTER_ADDRESS, grpc_address=GRPC_PROXY_ADDRESS)
-        model = ModelVersion.find(hs_cluster, model_name, int(model_version))
+        model = ModelVersion.find_by_id(hs_cluster, int(model_version_id))
+        model_name = model.name
+        model_version = model.version
     except ValueError as e:
         self.update_state(state=TaskStates.ERROR,
                           meta={'message': f"Error: {e}", 'code': 404})
@@ -96,7 +104,7 @@ def transform_task(self, method, request_json):
             training_df = None
     else:
         training_df = None
-    production_requests_df = get_production_subsample(model.id, SUBSAMPLE_SIZE)
+    production_requests_df = get_production_subsample(model.id, production_data_sample_size)
 
     if production_requests_df.empty:
         self.update_state(state=TaskStates.NO_DATA,
@@ -136,7 +144,9 @@ def transform_task(self, method, request_json):
             logging.error(f"Couldn't create {model_name}v{model_version} servable. Error:{e}")
             training_embeddings = None
         else:
-            training_embeddings = compute_training_embeddings(model, servable, training_df)
+            training_data_sample_size = min(training_data_sample_size, len(training_df))
+            training_df_sample = training_df.sample(training_data_sample_size)
+            training_embeddings = compute_training_embeddings(model, servable, training_df_sample)
             Servable.delete(hs_cluster, servable.name)
 
     plottable_data, transformer = transform_high_dimensional(method, parameters,
@@ -144,7 +154,6 @@ def transform_task(self, method, request_json):
                                                              transformer,
                                                              vis_metrics=vis_metrics)
     plottable_data.update(requests_data_dict)
-    plottable_data["parameters"] = parameters
 
     result_path = s3_model_path + '/result.json'
     try:
@@ -166,7 +175,7 @@ def transform_task(self, method, request_json):
     if transformer_saved_to_s3:
         db_model_info['transformer_file'] = transformer_path
 
-    update_record(db, method, db_model_info, model_name, model_version)
+    update_record(db, method, db_model_info, model.id)
 
     logging.info(f'Request handled in {datetime.now() - start}')
 

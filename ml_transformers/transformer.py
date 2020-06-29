@@ -1,15 +1,16 @@
 import warnings
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Dict
+from typing import Dict, Tuple, Optional
 
 import numpy as np
+from loguru import logger
 from loguru import logger as logging
 from umap import UMAP
 
 from .metrics import global_score, sammon_error, stability_score, auc_score, intristic_multiscale_score, \
     clustering_score
-from .utils import DEFAULT_PARAMETERS
+from .utils import DEFAULT_TRANSFORMER_PARAMETERS, VisMetrics, AVAILBALE_VIS_METRICS
 
 
 class Transformer(ABC):
@@ -38,8 +39,7 @@ class Transformer(ABC):
         return None
 
     def eval(self, X: np.ndarray, _X: np.ndarray, y=None,
-             evaluation_metrics=("global_score", "sammon_error",
-                                 "auc_score", "stability_score", "msid", "clustering"),
+             evaluation_metrics: Tuple[VisMetrics] = tuple(AVAILBALE_VIS_METRICS),
              _auc_cv=5) -> Dict[str, str]:
         """
         Evaluates vizualization using listed evaluation_metrics names
@@ -52,22 +52,21 @@ class Transformer(ABC):
         """
         start = datetime.now()
         eval_metrics = {}
-        if 'global_score' in evaluation_metrics:
-            eval_metrics['global_score'] = str(global_score(X, _X))
-        if 'sammon_error' in evaluation_metrics:
-
-            eval_metrics['sammon_error'] = str(sammon_error(X, _X))
-        if 'auc_score' in evaluation_metrics and y is not None:
+        if VisMetrics.global_score in evaluation_metrics:
+            eval_metrics[VisMetrics.global_score.name] = str(global_score(X, _X))
+        if VisMetrics.sammon_error in evaluation_metrics:
+            eval_metrics[VisMetrics.sammon_error.name] = str(sammon_error(X, _X))
+        if VisMetrics.auc_score in evaluation_metrics and y is not None:
             acc_result = auc_score(_X, y)
-            eval_metrics['knn_acc'] = str(acc_result['knn_acc'])
+            eval_metrics['knn_acc'] = str(acc_result['knn_acc'])  # TODO knn_acc
             eval_metrics['svc_acc'] = str(acc_result['svc_acc'])
-        if 'stability_score' in evaluation_metrics:
-            eval_metrics['stability'] = str(stability_score(X, self.__instance__))
-        if 'msid' in evaluation_metrics:
-            eval_metrics['msid'] = str(intristic_multiscale_score(X, _X))
-        if 'clustering' in evaluation_metrics and y is not None:
+        if VisMetrics.stability in evaluation_metrics:
+            eval_metrics[VisMetrics.stability.name] = str(stability_score(X, self.__instance__))
+        if VisMetrics.msid in evaluation_metrics:
+            eval_metrics[VisMetrics.msid.name] = str(intristic_multiscale_score(X, _X))
+        if VisMetrics.clustering in evaluation_metrics and y is not None:
             ars, ami = clustering_score(_X, y)
-            eval_metrics['clustering_random_score'] = str(ars)
+            eval_metrics['clustering_random_score'] = str(ars)  # TODO svc_acc
             eval_metrics['clustering_mutual_info'] = str(ami)
         logging.info(f'Evaluation of embeddings took {datetime.now() - start}')
         return eval_metrics
@@ -75,7 +74,7 @@ class Transformer(ABC):
 
 class UmapTransformer(Transformer):
     def __init__(self, parameters):
-        self.default_parameters = DEFAULT_PARAMETERS['umap']
+        self.default_parameters = DEFAULT_TRANSFORMER_PARAMETERS['umap']
         super().__init__(parameters)
         self.embedding_ = None
 
@@ -123,3 +122,63 @@ class UmapTransformer(Transformer):
         else:
             _X = self.transformer.transform(X)
         return _X
+
+
+def transform_high_dimensional(method, parameters,
+                               training_embeddings: Optional[np.ndarray],
+                               production_embeddings: np.ndarray,
+                               transformer_instance: Optional[Transformer] = None,
+                               vis_metrics: Tuple[VisMetrics] = tuple(AVAILBALE_VIS_METRICS)):
+    """
+    Transforms data from higher dimensions to lower
+    :param method: transformer method
+    :param parameters: {}
+    :param training_embeddings:
+    :param production_embeddings:
+    :param transformer_instance:
+    :param vis_metrics:
+    :return: (embedding dict, transformer)
+    """
+    result = {}
+    transformer = None
+    need_fit = True
+
+    if method == 'umap':
+        if transformer_instance and isinstance(transformer_instance, UmapTransformer):
+            need_fit = False
+            transformer = transformer_instance
+        else:
+            transformer = UmapTransformer(parameters)
+    if transformer is None:
+        logger.error('Cannot define transformer. Illegal method name')
+
+    if training_embeddings is not None and production_embeddings is not None:
+        total_embeddings = np.concatenate([production_embeddings, training_embeddings])
+    else:
+        total_embeddings = production_embeddings  # 100
+
+    start = datetime.now()
+    if not need_fit and method == 'umap':
+        plottable_embeddings = transformer.transform(total_embeddings)
+    else:
+        plottable_embeddings = transformer.fit_transform(
+            total_embeddings)  # TODO add ground truth labels management for semi-supervised umap
+    logger.info(
+        f'Fitting {total_embeddings.shape[0]} {total_embeddings.shape[1]}-dimensional points took '
+        f'{datetime.now() - start}')
+
+    vis_eval_metrics = transformer.eval(total_embeddings, plottable_embeddings,
+                                        y=None,
+                                        evaluation_metrics=vis_metrics)  # TODO add ground truth_labels
+
+    plottable_training_embeddings = plottable_embeddings[len(production_embeddings):]
+    plottable_prod_embeddings = plottable_embeddings[:len(production_embeddings)]
+    result['data_shape'] =  plottable_prod_embeddings.shape
+    result['data'] =  plottable_prod_embeddings.tolist()
+    result['visualization_metrics'] = vis_eval_metrics
+    if len(plottable_training_embeddings) > 0:
+        result['training_data'] = plottable_training_embeddings.tolist()
+        result['training_data_shape'] = plottable_training_embeddings.shape
+    transformer.embedding_ = None  # ?
+
+    return result, transformer

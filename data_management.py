@@ -18,7 +18,8 @@ from pymongo import MongoClient
 from conf import AWS_STORAGE_ENDPOINT, HS_CLUSTER_ADDRESS, HYDRO_VIS_BUCKET_NAME, EMBEDDING_FIELD, \
     N_NEIGHBOURS
 from ml_transformers.transformer import Transformer
-from ml_transformers.utils import DEFAULT_PARAMETERS, Coloring, get_top_N_neighbours
+from ml_transformers.utils import DEFAULT_TRANSFORMER_PARAMETERS, Coloring, get_top_N_neighbours, \
+    DEFAULT_PROJECTION_PARAMETERS
 
 
 def get_mongo_client(mongo_url, mongo_port, mongo_user, mongo_pass, mongo_auth_db):
@@ -214,30 +215,31 @@ def parse_embeddings_from_dataframe(df):
     return embeddings
 
 
-def get_record(db, method, model_name, model_version) -> Dict:
-    existing_record = db[method].find_one({"model_name": model_name,
-                                           "model_version": model_version})
+def get_record(db, method, model_version_id: str) -> Dict:
+    model_version_id = str(model_version_id)
+    existing_record = db[method].find_one({"model_version_id": model_version_id})
     if not existing_record:
-        return {"model_name": model_name,
-                "model_version": model_version,
+        return {"model_version_id": model_version_id,
                 "result_file": "",
                 "transformer_file": "",
-                "parameters": DEFAULT_PARAMETERS[method],
-                "use_labels": False}
+                "parameters": DEFAULT_TRANSFORMER_PARAMETERS[method],
+                "visualization_metrics": DEFAULT_PROJECTION_PARAMETERS['visualization_metrics'],
+                "production_data_sample_size": DEFAULT_PROJECTION_PARAMETERS['production_data_sample_size'],
+                "training_data_sample_size": DEFAULT_PROJECTION_PARAMETERS['training_data_sample_size']}
     else:
         return existing_record
 
 
-def update_record(db, method, record, model_name, model_version):
-    model_version = str(model_version)
+def update_record(db, method, record, model_version_id):
+    model_version_id = str(model_version_id)
     if '_id' in record:
         del record['_id']
-    db[method].update_one({"model_name": model_name,
-                           "model_version": model_version},
+    db[method].update_one({"model_version_id": model_version_id},
                           {"$set": record}, upsert=True)
 
 
-def compute_training_embeddings(model: ModelVersion, servable: Servable, training_data: pd.DataFrame) -> Optional[np.ndarray]:
+def compute_training_embeddings(model: ModelVersion, servable: Servable, training_data: pd.DataFrame) -> Optional[
+    np.ndarray]:
     """
     Computes embeddings from training data using unmonitorable servable
     :param model: model instance
@@ -268,6 +270,7 @@ def get_production_subsample(model_id, size=1000) -> pd.DataFrame:
     if r.status_code != 200:
         return pd.DataFrame()
     return pd.DataFrame.from_dict(r.json())
+
 
 def valid_embedding_model(model: ModelVersion) -> [bool]:
     """

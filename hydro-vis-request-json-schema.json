@@ -5,29 +5,8 @@
   "type": "object",
   "title": "",
   "default": null,
-  "required": [
-    "model_name",
-    "model_version"
-  ],
+  "required": [],
   "properties": {
-    "model_name": {
-      "$id": "#/properties/model_name",
-      "type": "string",
-      "title": "The Model_name Schema",
-      "examples": [
-        "adult_scalar"
-      ],
-      "minLength": 1,
-      "pattern": "^(.*)$"
-    },
-    "model_version": {
-      "$id": "#/properties/model_version",
-      "type": "integer",
-      "title": "The Model_version Schema",
-      "examples": [
-        1
-      ]
-    },
     "visualization_metrics": {
       "$id": "#/properties/visualization_metrics",
       "type": "array",

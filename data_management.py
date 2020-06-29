@@ -215,7 +215,7 @@ def parse_embeddings_from_dataframe(df):
     return embeddings
 
 
-def get_record(db, method, model_version_id: str) -> Dict:
+def get_record(db, method, model_version_id: [str, int]) -> Dict:
     model_version_id = str(model_version_id)
     existing_record = db[method].find_one({"model_version_id": model_version_id})
     if not existing_record:

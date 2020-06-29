@@ -56,7 +56,7 @@ def transform_task(self, method, model_version_id):
     result_path = db_model_info.get('result_file', '')
     vis_metrics: List[str] = db_model_info.get('visualization_metrics',
                                                DEFAULT_PROJECTION_PARAMETERS['visualization_metrics'])
-    vis_metrics: List[VisMetrics] = [VisMetrics.to_enum(metric_name) for metric_name in vis_metrics]
+    vis_metrics: List[VisMetrics] = [VisMetrics(metric_name) for metric_name in vis_metrics]
     training_data_sample_size = db_model_info.get('training_data_sample_size',
                                                   DEFAULT_PROJECTION_PARAMETERS['training_data_sample_size'])
 

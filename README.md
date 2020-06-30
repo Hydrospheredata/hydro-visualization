@@ -1,4 +1,4 @@
-# hydro-vis
+# hydro-visualization
 Service for visualization of high dimensional for hydrosphere
 
 ## DEPENDENCIES

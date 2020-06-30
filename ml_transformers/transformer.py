@@ -52,19 +52,19 @@ class Transformer(ABC):
         """
         start = datetime.now()
         eval_metrics = {}
-        if VisMetrics.global_score in evaluation_metrics:
-            eval_metrics[VisMetrics.global_score.name] = str(global_score(X, _X))
-        if VisMetrics.sammon_error in evaluation_metrics:
-            eval_metrics[VisMetrics.sammon_error.name] = str(sammon_error(X, _X))
-        if VisMetrics.auc_score in evaluation_metrics and y is not None:
+        if VisMetrics.GLOBAL_SCORE in evaluation_metrics:
+            eval_metrics[VisMetrics.GLOBAL_SCORE.value] = str(global_score(X, _X))
+        if VisMetrics.SAMMON_ERROR in evaluation_metrics:
+            eval_metrics[VisMetrics.SAMMON_ERROR.value] = str(sammon_error(X, _X))
+        if VisMetrics.AUC_SCORE in evaluation_metrics and y is not None:
             acc_result = auc_score(_X, y)
             eval_metrics['knn_acc'] = str(acc_result['knn_acc'])  # TODO knn_acc
             eval_metrics['svc_acc'] = str(acc_result['svc_acc'])
-        if VisMetrics.stability in evaluation_metrics:
-            eval_metrics[VisMetrics.stability.name] = str(stability_score(X, self.__instance__))
-        if VisMetrics.msid in evaluation_metrics:
-            eval_metrics[VisMetrics.msid.name] = str(intristic_multiscale_score(X, _X))
-        if VisMetrics.clustering in evaluation_metrics and y is not None:
+        if VisMetrics.STABILITY in evaluation_metrics:
+            eval_metrics[VisMetrics.STABILITY.value] = str(stability_score(X, self.__instance__))
+        if VisMetrics.MSID in evaluation_metrics:
+            eval_metrics[VisMetrics.MSID.value] = str(intristic_multiscale_score(X, _X))
+        if VisMetrics.CLUSTERING in evaluation_metrics and y is not None:
             ars, ami = clustering_score(_X, y)
             eval_metrics['clustering_random_score'] = str(ars)  # TODO svc_acc
             eval_metrics['clustering_mutual_info'] = str(ami)

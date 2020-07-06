@@ -2,7 +2,9 @@ from enum import Enum
 from typing import Dict
 
 import numpy as np
-import umap
+import pandas as pd
+from hydrosdk.contract import ProfilingType
+from hydrosdk.modelversion import ModelVersion
 from sklearn.exceptions import NotFittedError
 from sklearn.preprocessing import OneHotEncoder, RobustScaler, OrdinalEncoder
 
@@ -15,18 +17,20 @@ class TransformationType(Enum):
     IGNORE = 4
 
 
-PROFILE_TYPE_TO_TRANSFORMATION = {0: TransformationType.IGNORE,
-                                  1: TransformationType.ONE_HOT,
-                                  11: TransformationType.ONE_HOT,
-                                  12: TransformationType.ORDINAL,
-                                  2: TransformationType.ROBUST,
-                                  21: TransformationType.ROBUST,
-                                  22: TransformationType.NO_TRANSFORMATION,
-                                  23: TransformationType.NO_TRANSFORMATION,
-                                  3: TransformationType.IGNORE,
-                                  4: TransformationType.IGNORE,
-                                  5: TransformationType.IGNORE,
-                                  6: TransformationType.IGNORE}
+NUMERICAL_TRANSFORMS = set(TransformationType) - {TransformationType.ONE_HOT}
+
+PROFILE_TYPE_TO_TRANSFORMATION = {ProfilingType.NONE: TransformationType.IGNORE,
+                                  ProfilingType.CATEGORICAL: TransformationType.ONE_HOT,
+                                  ProfilingType.NOMINAL: TransformationType.ONE_HOT,
+                                  ProfilingType.ORDINAL: TransformationType.ORDINAL,
+                                  ProfilingType.NUMERICAL: TransformationType.ROBUST,
+                                  ProfilingType.CONTINUOUS: TransformationType.ROBUST,
+                                  ProfilingType.INTERVAL: TransformationType.NO_TRANSFORMATION,
+                                  ProfilingType.RATIO: TransformationType.NO_TRANSFORMATION,
+                                  ProfilingType.IMAGE: TransformationType.IGNORE,
+                                  ProfilingType.VIDEO: TransformationType.IGNORE,
+                                  ProfilingType.AUDIO: TransformationType.IGNORE,
+                                  ProfilingType.TEXT: TransformationType.IGNORE}
 
 
 class AutoEmbeddingsEncoder:
@@ -55,7 +59,7 @@ class AutoEmbeddingsEncoder:
             self.fitted_robust = True
         self.fitted = self.fitted_one_hot and self.fitted_ordinal and self.fitted_robust
 
-    def _fit(self, transformation_type: TransformationType, features: np.array):
+    def __fit__(self, transformation_type: TransformationType, features: np.array):
         if transformation_type == TransformationType.ONE_HOT:
             self.one_hot_encoder.fit(features)
             self.fitted_one_hot = True
@@ -69,7 +73,7 @@ class AutoEmbeddingsEncoder:
             self.fitted_robust = True
             self.updated = True
 
-    def _transform(self, transformation_type: TransformationType, features: np.array) -> np.array:
+    def __transform__(self, transformation_type: TransformationType, features: np.array) -> np.array:
         transformed = features
         if transformation_type == TransformationType.ONE_HOT:
             try:
@@ -91,7 +95,7 @@ class AutoEmbeddingsEncoder:
                 transformed = self.ordinal_encoder.fit_transform(features)
         return transformed
 
-    def _fit_transform(self, transformation_type: TransformationType, features: np.array) -> np.array:
+    def __fit_transform__(self, transformation_type: TransformationType, features: np.array) -> np.array:
         transformed = features
         if transformation_type == TransformationType.ONE_HOT:
             transformed = self.one_hot_encoder.fit_transform(features)
@@ -109,24 +113,46 @@ class AutoEmbeddingsEncoder:
 
     def fit(self, feature_map: Dict[TransformationType, np.array]):
         for transformation_type, features in feature_map.items():
-            self._fit(transformation_type, features)
+            self.__fit__(transformation_type, features)
 
     def fit_transform(self, feature_map: Dict[TransformationType, np.array]) -> Dict[TransformationType, np.array]:
         transformation_result: Dict[TransformationType, np.array] = {}
         for transformation_type, features in feature_map.items():
-            transformed_features = self._fit_transform(transformation_type, features)
+            transformed_features = self.__fit_transform__(transformation_type, features)
             transformation_result[transformation_type] = transformed_features
         return transformation_result
 
     def transform(self, feature_map: Dict[TransformationType, np.array]) -> Dict[TransformationType, np.array]:
         transformation_result: Dict[TransformationType, np.array] = {}
         for transformation_type, features in feature_map.items():
-            transformed_features = self._transform(transformation_type, features)
+            transformed_features = self.__transform__(transformation_type, features)
             transformation_result[transformation_type] = transformed_features
+        return transformation_result
 
 
-embedding = umap.umap_.simplicial_set_embedding(fit1._raw_data, new_graph, fit1.n_components,
-                                                fit1.initial_alpha, fit1._a, fit1._b,
-                                                fit1.repulsion_strength, fit1.negative_sample_rate,
-                                                200, fit1.init, np.random, fit1.metric,
-                                                fit1._metric_kwds, False)
+def dataframe_to_feature_map(inputs_dataframe: pd.DataFrame, model: ModelVersion) -> Dict[
+    TransformationType, np.array]:
+    """
+
+    :param inputs_dataframe: Dataframe with model inputs as columns
+    :param model: hydrosphere model version id
+    :return:
+    """
+    model_inputs = list(model.contract.predict.inputs)
+    scalar_inputs = list(filter((lambda inpt: len(inpt.shape.dim) == 0), model_inputs))
+    assert len(scalar_inputs) > 0
+    features_map: Dict[TransformationType, np.array] = {}
+    for scalar_input in scalar_inputs:
+        input_training_data = inputs_dataframe.get(scalar_input.name)
+        if input_training_data is None:
+            continue
+        profiling_type = ProfilingType(scalar_input.profile)
+        input_transformation = PROFILE_TYPE_TO_TRANSFORMATION.get(profiling_type, TransformationType.IGNORE)
+        transformation_features = features_map.get(input_transformation, None)
+        if transformation_features is None:
+            transformation_features = input_training_data.to_numpy().reshape((-1, 1))
+        else:
+            transformation_features = np.concatenate(
+                [transformation_features, input_training_data.to_numpy().reshape((-1, 1))], axis=1)
+        features_map[input_transformation] = transformation_features
+    return features_map

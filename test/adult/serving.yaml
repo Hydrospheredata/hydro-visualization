@@ -76,14 +76,14 @@ contract:
       profile: numerical
 ---
 kind: Model
-name: "adult_scalar_test"
+name: "adult_scalar_vis_test"
 payload:
   - "model/src/"
   - "model/requirements.txt"
   - "model/classification_model.joblib"
 runtime: "hydrosphere/serving-runtime-python-3.6:0.1.2-rc0"
 install-command: "pip install -r requirements.txt"
-training-data: data/profile.csv
+training-data: data/profile2.csv
 contract:
   name: "predict"
   inputs:
@@ -156,6 +156,6 @@ monitoring:
       threshold: 12
 ---
 kind: Application
-name: adult_scalar_test
+name: adult_scalar_vis_test
 singular:
-  model: adult_scalar_test:1
+  model: adult_scalar_vis_test:1

@@ -77,7 +77,7 @@ class UmapTransformer(Transformer):
     def __init__(self, parameters):
         self.default_parameters = DEFAULT_TRANSFORMER_PARAMETERS['umap']
         super().__init__(parameters)
-        self.embedding_ = None
+        self.numerical_embedding_ = None
 
     def __set_params__(self, parameters):
         self.min_dist = parameters.get('min_dist', self.default_parameters['min_dist'])
@@ -106,7 +106,7 @@ class UmapTransformer(Transformer):
             self.transformer.fit(X, y)
         else:
             self.transformer.fit(X)
-        self.embedding_ = self.transformer.embedding_
+        self.numerical_embedding_ = self.transformer.embedding_
 
     def fit_transform(self, X, y=None):
         warnings.filterwarnings('ignore')
@@ -114,7 +114,7 @@ class UmapTransformer(Transformer):
             _X = self.transformer.fit_transform(X, y)
         else:
             _X = self.transformer.fit_transform(X)
-        self.embedding_ = _X
+        self.numerical_embedding_ = _X
         return _X
 
     def transform(self, X, y=None):
@@ -128,10 +128,12 @@ class UmapTransformer(Transformer):
 
 class UmapTransformerMixedTypes(UmapTransformer):
     def __init__(self, parameters):
-        self.default_parameters = DEFAULT_TRANSFORMER_PARAMETERS['umap']
         super().__init__(parameters)
+        self.default_parameters = DEFAULT_TRANSFORMER_PARAMETERS['umap_mixed']
+        self.categorical_weight = parameters.get('categorical_weight', self.default_parameters['categorical_weight'])
         (self.transformer, self.transformer_categorical), (
             self.__instance__, self.__instance_categorical) = self.__create__()
+        self.numerical_embedding_ = None
         self.embedding_ = None
         self.categorical_embedding_ = None
 
@@ -158,21 +160,10 @@ class UmapTransformerMixedTypes(UmapTransformer):
                                         metric='jaccard')
         return (transformer, transformer_categorical), (__instance__, __instance_categorical__)
 
-    # fit1 = umap.UMAP().fit(numerical_encoded)
-    # print('done')
-    # fit2 = umap.UMAP(metric='jaccard').fit(categorical_encoded)  # dice
-    # prod_graph = fit1.graph_.multiply(fit2.graph_)
-    # new_graph = 0.99 * prod_graph + 0.01 * (fit1.graph_ + fit2.graph_ - prod_graph)
-    # embedding_separate = umap.umap_.simplicial_set_embedding(fit1._raw_data, new_graph, fit1.n_components,
-    #                                                          fit1._initial_alpha, fit1._a, fit1._b,
-    #                                                          fit1.repulsion_strength, fit1.negative_sample_rate,
-    #                                                          200, fit1.init, np.random, fit1.metric,
-    #                                                          fit1._metric_kwds, False)
-
     def fit(self, X, X_categorical=None, y=None):
         warnings.filterwarnings('ignore')
         if X_categorical is None:
-            super().fit(X, y)
+            raise ValueError('X_categorical should should not be None')
         else:
             if y is None:
                 self.transformer.fit(X)
@@ -183,13 +174,14 @@ class UmapTransformerMixedTypes(UmapTransformer):
             else:
                 self.transformer.fit(X)
                 self.transformer_categorical.fit(X_categorical)
-            self.embedding_ = self.transformer.embedding_
-            self.categorical_embedding_ = self.transformer_categorical.embedding_
+            self.fit_transform(X, X_categorical)
 
     def fit_transform(self, X, X_categorical=None, y=None):
         warnings.filterwarnings('ignore')
         if X_categorical is None:
-            return super().fit_transform(X, y)
+            raise ValueError('X_categorical should should not be None')
+        elif X is None:
+            raise NotImplementedError('This transformer do not support fitting of only categorical data')
         else:
             if self.use_labels:
                 self.transformer.fit(X, y)
@@ -197,27 +189,28 @@ class UmapTransformerMixedTypes(UmapTransformer):
             else:
                 self.transformer.fit(X)
                 self.transformer_categorical.fit(X_categorical)
-            prod_graph = self.transformer.graph_.multiply(self.transformer_categorical.graph_)
-            new_graph = 0.99 * prod_graph + 0.01 * (
-                        self.transformer.graph_ + self.transformer_categorical.graph_ - prod_graph)
-            embedding_separate = umap.umap_.simplicial_set_embedding(self.transformer._raw_data, new_graph,
-                                                                     self.transformer.n_components,
-                                                                     self.transformer._initial_alpha,
-                                                                     self.transformer._a, self.transformer._b,
-                                                                     self.transformer.repulsion_strength,
-                                                                     self.transformer.negative_sample_rate,
-                                                                     200, self.transformer.init, np.random,
-                                                                     self.transformer.metric,
-                                                                     self.transformer._metric_kwds, False)
-            # TODO embeddings?
-            return embedding_separate
+            intersection = umap.umap_.general_simplicial_set_intersection(self.transformer_categorical.graph_,
+                                                                          self.transformer.graph_,
+                                                                          weight=self.categorical_weight)
+            intersection = umap.umap_.reset_local_connectivity(intersection)
+            embedding = umap.umap_.simplicial_set_embedding(self.transformer_categorical._raw_data,
+                                                            intersection, self.transformer_categorical.n_components,
+                                                            self.transformer_categorical._initial_alpha,
+                                                            self.transformer_categorical._a,
+                                                            self.transformer_categorical._b,
+                                                            self.transformer_categorical.repulsion_strength,
+                                                            self.transformer_categorical.negative_sample_rate,
+                                                            200, 'random', np.random,
+                                                            self.transformer_categorical.metric,
+                                                            self.transformer_categorical._metric_kwds, False)
+
+            self.numerical_embedding_ = self.transformer.embedding_
+            self.categorical_embedding_ = self.transformer_categorical.embedding_
+            self.embedding_ = embedding
+            return embedding
 
     def transform(self, X, X_categorical=None, y=None):
-        pass
-
-
-    def transform(self, X, X_categorical=None, y=None):
-        pass
+        raise NotImplementedError(f'{self.__class__.__name__} cannot transform data. Use fit_transform() instead.')
 
 
 def transform_high_dimensional(method, parameters,
@@ -275,6 +268,78 @@ def transform_high_dimensional(method, parameters,
     if len(plottable_training_embeddings) > 0:
         result['training_data'] = plottable_training_embeddings.tolist()
         result['training_data_shape'] = plottable_training_embeddings.shape
-    transformer.embedding_ = None  # ?
+    transformer.numerical_embedding_ = None  # ?
 
     return result, transformer
+
+
+
+def transform_high_dimensional(method, parameters,
+                               training_embeddings: Optional[np.ndarray],
+                               production_embeddings: np.ndarray,
+                               transformer_instance: Optional[Transformer] = None,
+                               vis_metrics: Tuple[VisMetrics] = tuple(AVAILBALE_VIS_METRICS)):
+    """
+    Transforms data from higher dimensions to lower
+    :param method: transformer method
+    :param parameters: {}
+    :param training_embeddings:
+    :param production_embeddings:
+    :param transformer_instance:
+    :param vis_metrics:
+    :return: (embedding dict, transformer)
+    """
+    result = {}
+    transformer = None
+    need_fit = True
+
+    if method == 'umap':
+        if transformer_instance and isinstance(transformer_instance, UmapTransformer):
+            need_fit = False
+            transformer = transformer_instance
+        else:
+            transformer = UmapTransformer(parameters)
+    if transformer is None:
+        logger.error('Cannot define transformer. Illegal method name')
+
+    if training_embeddings is not None and production_embeddings is not None:
+        total_embeddings = np.concatenate([production_embeddings, training_embeddings])
+    else:
+        total_embeddings = production_embeddings  # 100
+
+    start = datetime.now()
+    if not need_fit and method == 'umap':
+        plottable_embeddings = transformer.transform(total_embeddings)
+    else:
+        plottable_embeddings = transformer.fit_transform(
+            total_embeddings)  # TODO add ground truth labels management for semi-supervised umap
+    logger.info(
+        f'Fitting {total_embeddings.shape[0]} {total_embeddings.shape[1]}-dimensional points took '
+        f'{datetime.now() - start}')
+
+    vis_eval_metrics = transformer.eval(total_embeddings, plottable_embeddings,
+                                        y=None,
+                                        evaluation_metrics=vis_metrics)  # TODO add ground truth_labels
+
+    plottable_training_embeddings = plottable_embeddings[len(production_embeddings):]
+    plottable_prod_embeddings = plottable_embeddings[:len(production_embeddings)]
+    result['data_shape'] = plottable_prod_embeddings.shape
+    result['data'] = plottable_prod_embeddings.tolist()
+    result['visualization_metrics'] = vis_eval_metrics
+    if len(plottable_training_embeddings) > 0:
+        result['training_data'] = plottable_training_embeddings.tolist()
+        result['training_data_shape'] = plottable_training_embeddings.shape
+    transformer.numerical_embedding_ = None  # ?
+
+    return result, transformer
+
+
+# fit1 = umap.UMAP().fit(numerical_encoded)
+#   fit2 = umap.UMAP(metric='jaccard').fit(categorical_encoded)
+#   intersection = umap.umap_. general_simplicial_set_intersection(fit1.graph_, fit2.graph_, weight=categorical_weight)
+#   intersection = umap.umap_.reset_local_connectivity(intersection)
+#   embedding = umap.umap_.simplicial_set_embedding(fit1._raw_data, intersection, fit1.n_components,
+#                                                 fit1._initial_alpha, fit1._a, fit1._b,
+#                                                 fit1.repulsion_strength, fit1.negative_sample_rate,
+#                                                 200, 'random', np.random, fit1.metric,
+#                                                 fit1._metric_kwds, False)

@@ -17,6 +17,8 @@ from pymongo import MongoClient
 
 from conf import AWS_STORAGE_ENDPOINT, HS_CLUSTER_ADDRESS, HYDRO_VIS_BUCKET_NAME, EMBEDDING_FIELD, \
     N_NEIGHBOURS
+from ml_transformers.autoembeddings import dataframe_to_feature_map, AutoEmbeddingsEncoder, TransformationType, \
+    NUMERICAL_TRANSFORMS
 from ml_transformers.transformer import Transformer
 from ml_transformers.utils import DEFAULT_TRANSFORMER_PARAMETERS, Coloring, get_top_N_neighbours, \
     DEFAULT_PROJECTION_PARAMETERS
@@ -283,3 +285,45 @@ def valid_embedding_model(model: ModelVersion) -> [bool]:
     if EMBEDDING_FIELD not in output_names:
         return False
     return True
+
+
+def generate_auto_embeddings(training_data: pd.DataFrame, production_data: pd.DataFrame, model: ModelVersion):
+    """
+
+    :param training_data:
+    :param production_data:
+    :param model:
+    :return:
+    """
+    # 1. Merge somehow training and production data?
+    # 2. Fit autoembeddings on training, transform on production
+    # Return easy-peasy
+    # 3. Add tests
+    model_inputs = list(model.contract.predict.inputs)
+    input_names = [model_input.name for model_input in model_inputs]
+    used_inputs = training_data.columns.intersection(input_names)
+    training_feature_map = dataframe_to_feature_map(training_data[used_inputs], model)
+    production_feature_map = dataframe_to_feature_map(production_data[used_inputs], model)
+    if len(training_feature_map) == 0 or len(production_feature_map) == 0:
+        return None, None  # not enough data
+
+    encoder = AutoEmbeddingsEncoder()  # TODO handle loading from S3? Do we really need it? need it in order to not use training data always
+    # TODO but we do not have transform from umap
+    training_embeddings_map = encoder.fit_transform(training_feature_map)
+    production_embeddings_map = encoder.transform(production_feature_map)
+    training_numerical_embeddings, training_categorical_embeddings = None, None
+    production_numerical_embeddings, production_categorical_embeddings = None, None
+
+    if TransformationType.ONE_HOT in training_embeddings_map.keys():
+        training_categorical_embeddings = np.concatenate(
+            [v for k, v in training_embeddings_map.items() if k == TransformationType.ONE_HOT], axis=1)
+        production_categorical_embeddings = np.concatenate(
+            [v for k, v in production_embeddings_map.items() if k == TransformationType.ONE_HOT], axis=1)
+    if len(NUMERICAL_TRANSFORMS & set(training_embeddings_map.keys())) != 0:
+        training_numerical_embeddings = np.concatenate(
+            [v for k, v in training_embeddings_map.items() if k != TransformationType.ONE_HOT], axis=1)
+        production_numerical_embeddings = np.concatenate(
+            [v for k, v in production_embeddings_map.items() if k != TransformationType.ONE_HOT], axis=1)
+
+    return (training_numerical_embeddings, training_categorical_embeddings), (
+        production_numerical_embeddings, production_categorical_embeddings)

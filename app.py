@@ -14,7 +14,7 @@ from loguru import logger as logging
 from conf import MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, DEBUG_ENV, \
     APP_PORT, HS_CLUSTER_ADDRESS, GRPC_PROXY_ADDRESS, EMBEDDING_FIELD
 from data_management import S3Manager, update_record, \
-    get_mongo_client, valid_embedding_model
+    get_mongo_client, model_has_embeddings
 from data_management import get_record
 from ml_transformers.utils import AVAILABLE_TRANSFORMERS, DEFAULT_PROJECTION_PARAMETERS
 
@@ -156,7 +156,7 @@ def supported():
     except Exception as e:
         return {"supported": False, "message": f"Could not check if model {model_version_id} is valid"}, 200
 
-    if valid_embedding_model(model):
+    if model_has_embeddings(model):
         return {"supported": True, "message": "Model is supported"}, 200
     else:
         return {"supported": False, "message": f"No '{EMBEDDING_FIELD}' field in model output fields"}, 200

@@ -2,7 +2,7 @@ import json
 import random
 import tempfile
 from time import sleep
-from typing import Dict, Optional, List, Tuple
+from typing import Dict, Optional, List, Tuple, Any
 
 import boto3
 import joblib
@@ -17,9 +17,6 @@ from pymongo import MongoClient
 
 from conf import AWS_STORAGE_ENDPOINT, HS_CLUSTER_ADDRESS, HYDRO_VIS_BUCKET_NAME, EMBEDDING_FIELD, \
     N_NEIGHBOURS
-from ml_transformers.autoembeddings import dataframe_to_feature_map, AutoEmbeddingsEncoder, TransformationType, \
-    NUMERICAL_TRANSFORMS
-from ml_transformers.transformer import Transformer
 from ml_transformers.utils import DEFAULT_TRANSFORMER_PARAMETERS, Coloring, get_top_N_neighbours, \
     DEFAULT_PROJECTION_PARAMETERS
 
@@ -79,8 +76,7 @@ class S3Manager:
         '''
         Reads json
         If file not found or couldn't parse content, return empty Dict and log error
-        :param bucket_name:
-        :param filename:
+        :param filepath: in format 's3://path-to-file'
         :return: file content or {} in case of error
         '''
         if not self.fs.exists(filepath):
@@ -96,17 +92,15 @@ class S3Manager:
             return {}
         return js_object
 
-    def write_transformer_model(self, transformer, filepath) -> bool:
+    def dump_with_joblib(self, object, filepath) -> bool:
         """
-
-        :param transformer:
-        :param bucket_name:
-        :param filename:
-        :return:
+        :param object:
+        :param filepath: in format 's3://path-to-file'
+        :return: success
         """
         with tempfile.TemporaryFile() as fp:
             try:
-                joblib.dump(transformer, fp)
+                joblib.dump(object, fp)
             except Exception as e:
                 logging.error(f'Couldn\'t dump joblib file: {filepath}. Error: {e}')
                 return False
@@ -119,32 +113,35 @@ class S3Manager:
                 return False
         return True
 
-    def read_transformer_model(self, bucket_name, filename) -> Optional[Transformer]:
+    def load_with_joblib(self, filepath) -> Optional[Any]:
         """
-        Loads pretrained transformer model from S3
+        Loads joblib objects from S3
         if file not found: return None
         if is not joblib file: return None
-        if not Transformer instance: return None
-        :param bucket_name:
-        :param filename:
-        :return: Transformer/None
+        :param filepath: in format 's3://path-to-file'
+        :return: Object/None
         """
-        if not self.fs.exists(f's3://{bucket_name}/{filename}'):
-            logging.error(f'No such file {bucket_name}/{filename}')
+        clean_path = filepath.replace('s3://', '')
+        if not self.fs.exists(filepath):
+            logging.error(f'No such file {filepath}')
             return None
-        with self.fs.open(f'{bucket_name}/{filename}', 'rb') as f:
+        with self.fs.open(clean_path, 'rb') as f:
             try:
-                transformer = joblib.load(f)
+                object = joblib.load(f)
             except Exception as e:
-                logging.error(f'Couldn\'t load joblib model: {bucket_name}/{filename}')
+                logging.error(f'Couldn\'t load joblib file: {filepath}. Error: {e}')
                 return None
-            if not isinstance(transformer, Transformer):
-                logging.error(f'{bucket_name}/{filename} ({transformer.__class__}) is not Transformer instance. ')
-                return None
-            return transformer
+            return object
 
 
-def parse_requests_dataframe(df, monitoring_fields: List[Tuple[str, str]], embeddings: np.ndarray) -> Dict:
+def calcualte_neighbours(embeddings: np.array) -> List[List[int]]:
+    n_neighbours = min(N_NEIGHBOURS + 1, len(embeddings) - 1)
+    top_n_neighbours = get_top_N_neighbours(embeddings, N=n_neighbours)
+    return top_n_neighbours
+
+
+def parse_requests_dataframe(df, monitoring_fields: List[Tuple[str, str]],
+                             top_n_neighbours: List[List[int]] = []) -> Dict:
     """
     Extracts:
         - class prediction,
@@ -169,17 +166,17 @@ def parse_requests_dataframe(df, monitoring_fields: List[Tuple[str, str]], embed
         return coloring_info
 
     requests_ids = df['_id'].values.tolist()
-    N_neighbours = min(N_NEIGHBOURS + 1, len(embeddings) - 1)
-    top_N_neighbours = get_top_N_neighbours(embeddings, N=N_neighbours)
-    counterfactuals = [[] for _ in range(len(top_N_neighbours))]
+
+    counterfactuals = [[] for _ in range(len(top_n_neighbours))]
     predictions, confidence = [], []
     if 'class' in df.columns:
         predictions = {'data': df['class'].values.tolist()}
         predictions.update(get_coloring_info(df['class']))
         class_labels = df['class'].values.tolist()
-        counterfactuals = list(
-            map(lambda i: list(filter(lambda x: class_labels[x] != class_labels[i], top_N_neighbours[i])),
-                range(len(top_N_neighbours))))
+        if len(top_n_neighbours) > 0:
+            counterfactuals = list(
+                map(lambda i: list(filter(lambda x: class_labels[x] != class_labels[i], top_n_neighbours[i])),
+                    range(len(top_n_neighbours))))
         del class_labels
 
     if 'confidence' in df.columns:
@@ -208,7 +205,7 @@ def parse_requests_dataframe(df, monitoring_fields: List[Tuple[str, str]], embed
     return {'class_labels': class_info,
             'metrics': monitoring_data,
             'requests_ids': requests_ids,
-            'top_N': top_N_neighbours,
+            'top_N': top_n_neighbours,
             'counterfactuals': counterfactuals}
 
 
@@ -274,7 +271,7 @@ def get_production_subsample(model_id, size=1000) -> pd.DataFrame:
     return pd.DataFrame.from_dict(r.json())
 
 
-def valid_embedding_model(model: ModelVersion) -> [bool]:
+def model_has_embeddings(model: ModelVersion) -> [bool]:
     """
     TODO add embedding field shape check
     Check if model returns embeddings
@@ -285,45 +282,3 @@ def valid_embedding_model(model: ModelVersion) -> [bool]:
     if EMBEDDING_FIELD not in output_names:
         return False
     return True
-
-
-def generate_auto_embeddings(training_data: pd.DataFrame, production_data: pd.DataFrame, model: ModelVersion):
-    """
-
-    :param training_data:
-    :param production_data:
-    :param model:
-    :return:
-    """
-    # 1. Merge somehow training and production data?
-    # 2. Fit autoembeddings on training, transform on production
-    # Return easy-peasy
-    # 3. Add tests
-    model_inputs = list(model.contract.predict.inputs)
-    input_names = [model_input.name for model_input in model_inputs]
-    used_inputs = training_data.columns.intersection(input_names)
-    training_feature_map = dataframe_to_feature_map(training_data[used_inputs], model)
-    production_feature_map = dataframe_to_feature_map(production_data[used_inputs], model)
-    if len(training_feature_map) == 0 or len(production_feature_map) == 0:
-        return None, None  # not enough data
-
-    encoder = AutoEmbeddingsEncoder()  # TODO handle loading from S3? Do we really need it? need it in order to not use training data always
-    # TODO but we do not have transform from umap
-    training_embeddings_map = encoder.fit_transform(training_feature_map)
-    production_embeddings_map = encoder.transform(production_feature_map)
-    training_numerical_embeddings, training_categorical_embeddings = None, None
-    production_numerical_embeddings, production_categorical_embeddings = None, None
-
-    if TransformationType.ONE_HOT in training_embeddings_map.keys():
-        training_categorical_embeddings = np.concatenate(
-            [v for k, v in training_embeddings_map.items() if k == TransformationType.ONE_HOT], axis=1)
-        production_categorical_embeddings = np.concatenate(
-            [v for k, v in production_embeddings_map.items() if k == TransformationType.ONE_HOT], axis=1)
-    if len(NUMERICAL_TRANSFORMS & set(training_embeddings_map.keys())) != 0:
-        training_numerical_embeddings = np.concatenate(
-            [v for k, v in training_embeddings_map.items() if k != TransformationType.ONE_HOT], axis=1)
-        production_numerical_embeddings = np.concatenate(
-            [v for k, v in production_embeddings_map.items() if k != TransformationType.ONE_HOT], axis=1)
-
-    return (training_numerical_embeddings, training_categorical_embeddings), (
-        production_numerical_embeddings, production_categorical_embeddings)

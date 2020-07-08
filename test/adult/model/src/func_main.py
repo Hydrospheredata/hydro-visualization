@@ -44,4 +44,4 @@ def predict(**kwargs):
         tensor_shape=hs.TensorShapeProto(
             dim=[hs.TensorShapeProto.Dim(size=embs.shape[0]), hs.TensorShapeProto.Dim(size=embs.shape[1])]))
 
-    return hs.PredictResponse(outputs={"embedding": embs_proto, 'class': class_proto, 'confidence': conf_proto})
+    return hs.PredictResponse(outputs={"some_embedding": embs_proto, 'class': class_proto, 'confidence': conf_proto})

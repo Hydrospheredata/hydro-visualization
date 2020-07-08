@@ -61,7 +61,7 @@ contract:
       shape: scalar
       type: int64
       profile: numerical
-    embedding:
+    some_embedding:
       shape: [1, 100]
       type: double
       profile: numerical
@@ -136,7 +136,7 @@ contract:
       type: int64
       profile: nominal
   outputs:
-    embedding:
+    some_embedding:
       shape: [1, 100]
       type: double
       profile: numerical

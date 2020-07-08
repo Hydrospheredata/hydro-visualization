@@ -156,10 +156,11 @@ def supported():
     except Exception as e:
         return {"supported": False, "message": f"Could not check if model {model_version_id} is valid"}, 200
 
+    kek = 10
     if model_has_embeddings(model):
         return {"supported": True, "message": "Model is supported"}, 200
     else:
-        return {"supported": False, "message": f"No '{EMBEDDING_FIELD}' field in model output fields"}, 200
+        return {"supported": True, "message": f"No '{EMBEDDING_FIELD}' field in model output fields"}, 200 # TODO
 
 
 

@@ -196,14 +196,16 @@ def transform_task(self, method, model_version_id):
                               'message': f'{model_name}v{model_version} model requires training data to generate autoembeddings.',
                               'code': 404})
         raise Ignore()
-
+    logging.info(f'Embeddings exist: {embeddings_exist}')
     if embeddings_exist:
+        logging.info(f'Getting embeddings')
         production_embeddings, training_embeddings = get_embeddings(production_requests_df, training_df,
                                                                     training_data_sample_size, hs_cluster, model)
     else:
+        logging.info('Generating autoembeddings')
         [production_numerical_embeddings, production_categorical_embeddings], \
         [training_numerical_embeddings, training_categorical_embeddings], \
-        autoembeddings_encoder = generate_auto_embeddings(production_requests_df, training_df, model)
+        autoembeddings_encoder = generate_auto_embeddings(production_requests_df, training_df, model, encoder=autoembeddings_encoder)
 
         if training_numerical_embeddings is not None and training_categorical_embeddings is None:  # Only numerical features are used
             production_embeddings, training_embeddings = production_numerical_embeddings, training_numerical_embeddings
@@ -225,12 +227,14 @@ def transform_task(self, method, model_version_id):
                               MetricSpec.list_for_model(hs_cluster, model.id)]
 
     if type(training_embeddings) == np.array:  # not mixed-type data
+        logging.info('Fitting simple')
         top_N_neighbours = calcualte_neighbours(production_embeddings)
         plottable_result, transformer = transform_high_dimensional(method, parameters,
                                                                    training_embeddings, production_embeddings,
                                                                    transformer,
                                                                    vis_metrics=vis_metrics)
     else:  # mixed-type data
+        logging.info('Fitting mixed')
         top_N_neighbours = []
         plottable_result, transformer = transform_high_dimensional_mixed(method, parameters,
                                                                          training_embeddings, production_embeddings)
@@ -247,8 +251,7 @@ def transform_task(self, method, model_version_id):
         e = sys.exc_info()[1]
         logging.error(f'Couldn\'t save result to {path_to_result_file}: {e}')
 
-    if type(
-            transformer) != UmapTransformerWithMixedTypes:  # UmapTransformerWithMixedTypes is used only with fit_transform
+    if type(transformer) != UmapTransformerWithMixedTypes:  # UmapTransformerWithMixedTypes is used only with fit_transform
         transformer_path = s3_model_path + f'/transformer_{method}_{model_name}{model_version}'
         try:
             transformer_saved_to_s3 = s3manager.dump_with_joblib(transformer,

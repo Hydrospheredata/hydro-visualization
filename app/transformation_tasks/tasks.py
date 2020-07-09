@@ -13,12 +13,12 @@ from hydrosdk.monitoring import MetricSpec
 from hydrosdk.servable import Servable
 from loguru import logger as logging
 
-from app import celery, s3manager
-from ml_transformers.transformer import transform_high_dimensional
-from ml_transformers.utils import VisMetrics, DEFAULT_PROJECTION_PARAMETERS
-from utils.conf import MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, HYDRO_VIS_BUCKET_NAME, \
+from app.app import celery, s3manager
+from app.ml_transformers.transformer import transform_high_dimensional
+from app.ml_transformers.utils import VisMetrics, DEFAULT_PROJECTION_PARAMETERS
+from app.utils.conf import MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, HYDRO_VIS_BUCKET_NAME, \
     EMBEDDING_FIELD, HS_CLUSTER_ADDRESS, GRPC_PROXY_ADDRESS, TaskStates
-from utils.data_management import get_record, parse_embeddings_from_dataframe, parse_requests_dataframe, \
+from app.utils.data_management import get_record, parse_embeddings_from_dataframe, parse_requests_dataframe, \
     update_record, get_mongo_client, get_production_subsample, compute_training_embeddings, valid_embedding_model
 
 

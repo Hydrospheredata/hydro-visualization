@@ -11,12 +11,12 @@ from hydrosdk.modelversion import ModelVersion
 from jsonschema import Draft7Validator
 from loguru import logger as logging
 
-from ml_transformers.utils import AVAILABLE_TRANSFORMERS, DEFAULT_PROJECTION_PARAMETERS
-from utils.conf import MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, DEBUG_ENV, \
+from app.ml_transformers.utils import AVAILABLE_TRANSFORMERS, DEFAULT_PROJECTION_PARAMETERS
+from app.utils.conf import MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, DEBUG_ENV, \
     APP_PORT, HS_CLUSTER_ADDRESS, GRPC_PROXY_ADDRESS, EMBEDDING_FIELD
-from utils.data_management import S3Manager, update_record, \
+from app.utils.data_management import S3Manager, update_record, \
     get_mongo_client, valid_embedding_model
-from utils.data_management import get_record
+from app.utils.data_management import get_record
 
 with open("version") as f:
     VERSION = f.read().strip()
@@ -71,8 +71,6 @@ celery = make_celery(app)
 celery.autodiscover_tasks(["transformation_tasks"], force=True)
 celery.conf.update({"CELERY_DISABLE_RATE_LIMITS": True})
 
-import transformation_tasks
-
 
 @app.route(PREFIX + "/health", methods=['GET'])
 def hello():
@@ -104,8 +102,8 @@ def transform(method: str):
         return jsonify(
             {"message": f"Transformer method {method} is  not implemented."}), 400
 
-    result = transformation_tasks.tasks.transform_task.apply_async(args=(method, model_version_id),
-                                                                   queue="visualization")
+    result = app.transformation_tasks.tasks.transform_task.apply_async(args=(method, model_version_id),
+                                                                       queue="visualization")
 
     return jsonify({
         'task_id': result.task_id}), 202
@@ -134,8 +132,8 @@ def refit_model(method):
     if refit_transformer:
         db_model_info['transformer_file'] = ''
     update_record(db, method, db_model_info, model_version_id)
-    result = transformation_tasks.tasks.transform_task.apply_async(args=(method, model_version_id),
-                                                                   queue="visualization")
+    result = app.transformation_tasks.tasks.transform_task.apply_async(args=(method, model_version_id),
+                                                                       queue="visualization")
     return jsonify({
         'task_id': result.task_id}), 202
 
@@ -225,7 +223,7 @@ def model_status():
         return jsonify(
             {"message": f"Expected args: 'task_id'. Provided args: {set(request.args.keys())}"}), 400
     task_id = request.args.get('task_id')
-    task = transformation_tasks.tasks.transform_task.AsyncResult(task_id)
+    task = app.transformation_tasks.tasks.transform_task.AsyncResult(task_id)
     response = {
         'state': task.state,
         'task_id': task_id

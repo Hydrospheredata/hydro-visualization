@@ -18,6 +18,7 @@ AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID', '')
 EMBEDDING_FIELD = 'embedding'
 N_NEIGHBOURS = 100
 
+
 class TaskStates:
     NOT_SUPPORTED = 'NOT_SUPPORTED'
     ERROR = 'ERROR'

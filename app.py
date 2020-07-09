@@ -11,12 +11,12 @@ from hydrosdk.modelversion import ModelVersion
 from jsonschema import Draft7Validator
 from loguru import logger as logging
 
-from conf import MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, DEBUG_ENV, \
-    APP_PORT, HS_CLUSTER_ADDRESS, GRPC_PROXY_ADDRESS, EMBEDDING_FIELD
-from data_management import S3Manager, update_record, \
-    get_mongo_client, valid_embedding_model
-from data_management import get_record
 from ml_transformers.utils import AVAILABLE_TRANSFORMERS, DEFAULT_PROJECTION_PARAMETERS
+from utils.conf import MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, DEBUG_ENV, \
+    APP_PORT, HS_CLUSTER_ADDRESS, GRPC_PROXY_ADDRESS, EMBEDDING_FIELD
+from utils.data_management import S3Manager, update_record, \
+    get_mongo_client, valid_embedding_model
+from utils.data_management import get_record
 
 with open("version") as f:
     VERSION = f.read().strip()
@@ -29,7 +29,7 @@ with open("version") as f:
     }
 
 
-with open('./hydro-vis-params-json-schema.json') as f:
+with open('utils/hydro-vis-params-json-schema.json') as f:
     REQUEST_JSON_SCHEMA = json.load(f)
     params_validator = Draft7Validator(REQUEST_JSON_SCHEMA)
 

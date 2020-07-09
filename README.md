@@ -29,7 +29,7 @@ HYDRO_VIS_BUCKET_NAME = os.getenv('BUCKET_NAME', 'hydro-vis')
 
 ### Task states:
 
-![Task states](status.png)
+![Task states](docs/status.png)
 
 Whole API description is available [here](openapi.yaml)
 

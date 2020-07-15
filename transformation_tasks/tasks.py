@@ -13,16 +13,16 @@ from hydrosdk.servable import Servable
 from loguru import logger as logging
 
 from app import celery, s3manager
-from utils.conf import MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, HYDRO_VIS_BUCKET_NAME, \
-    HS_CLUSTER_ADDRESS, GRPC_PROXY_ADDRESS, TaskStates
-from utils.data_management import get_record, parse_embeddings_from_dataframe, parse_requests_dataframe, \
-    update_record, get_mongo_client, get_production_subsample, compute_training_embeddings, model_has_embeddings, \
-    calcualte_neighbours, get_training_data_path
 from ml_transformers.autoembeddings import AutoEmbeddingsEncoder, dataframe_to_feature_map, TransformationType, \
     NUMERICAL_TRANSFORMS
 from ml_transformers.transformer import transform_high_dimensional, transform_high_dimensional_mixed, \
     UmapTransformerWithMixedTypes
 from ml_transformers.utils import VisMetrics, DEFAULT_PROJECTION_PARAMETERS
+from utils.conf import MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, HYDRO_VIS_BUCKET_NAME, \
+    HS_CLUSTER_ADDRESS, GRPC_PROXY_ADDRESS, TaskStates
+from utils.data_management import get_record, parse_embeddings_from_dataframe, parse_requests_dataframe, \
+    update_record, get_mongo_client, get_production_subsample, compute_training_embeddings, model_has_embeddings, \
+    calcualte_neighbours, get_training_data_path
 
 
 def get_embeddings(production_df: pd.DataFrame, training_df: pd.DataFrame, training_data_sample_size: int,
@@ -151,7 +151,6 @@ def transform_task(self, method, model_version_id):
 
     if path_to_encoder:
         autoembeddings_encoder = s3manager.load_with_joblib(filepath=path_to_encoder)
-        logging.info('Loaded joblib')
     else:
         autoembeddings_encoder = None
 
@@ -179,13 +178,10 @@ def transform_task(self, method, model_version_id):
                               'message': f'{model_name}v{model_version} model requires training data to generate autoembeddings.',
                               'code': 404})
         raise Ignore()
-    logging.info(f'Embeddings exist: {embeddings_exist}')
     if embeddings_exist:
-        logging.info(f'Getting embeddings')
         production_embeddings, training_embeddings = get_embeddings(production_requests_df, training_df,
                                                                     training_data_sample_size, hs_cluster, model)
     else:
-        logging.info('Generating autoembeddings')
         [production_numerical_embeddings, production_categorical_embeddings], \
         [training_numerical_embeddings, training_categorical_embeddings], \
         autoembeddings_encoder = generate_auto_embeddings(production_requests_df, training_df, model,
@@ -211,17 +207,12 @@ def transform_task(self, method, model_version_id):
                               MetricSpec.list_for_model(hs_cluster, model.id)]
 
     if isinstance(training_embeddings, np.ndarray):  # not mixed-type data
-        logging.info('Fitting simple')
-        logging.info(f'{production_embeddings.shape}, {training_embeddings.shape}')
         top_N_neighbours = calcualte_neighbours(production_embeddings)
         plottable_result, transformer = transform_high_dimensional(method, parameters,
                                                                    training_embeddings, production_embeddings,
                                                                    transformer,
                                                                    vis_metrics=vis_metrics)
     else:  # mixed-type data
-        logging.info('Fitting mixed')
-        logging.info(f'{production_embeddings[0].shape}, {training_embeddings[0].shape}')
-        logging.info(f'len prod:{len(production_embeddings)}, len training: {len(training_embeddings)}')
         top_N_neighbours = []
         plottable_result, transformer = transform_high_dimensional_mixed(method, parameters,
                                                                          training_embeddings, production_embeddings)

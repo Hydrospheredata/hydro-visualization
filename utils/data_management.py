@@ -15,7 +15,6 @@ from hydrosdk.servable import Servable
 from loguru import logger as logging
 from pymongo import MongoClient
 
-from ml_transformers.transformer import Transformer
 from ml_transformers.utils import DEFAULT_TRANSFORMER_PARAMETERS, Coloring, get_top_N_neighbours, \
     DEFAULT_PROJECTION_PARAMETERS
 from utils.conf import AWS_STORAGE_ENDPOINT, HS_CLUSTER_ADDRESS, HYDRO_VIS_BUCKET_NAME, EMBEDDING_FIELD, \
@@ -270,6 +269,7 @@ def get_production_subsample(model_id, size=1000) -> pd.DataFrame:
     if r.status_code != 200:
         return pd.DataFrame()
     return pd.DataFrame.from_dict(r.json())
+
 
 def model_has_embeddings(model: ModelVersion) -> [bool]:
     """

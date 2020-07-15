@@ -12,11 +12,12 @@ from hydrosdk.modelversion import ModelVersion
 from jsonschema import Draft7Validator
 from loguru import logger as logging
 
+from ml_transformers.autoembeddings import NOT_IGNORED_PROFILE_TYPES
 from ml_transformers.utils import AVAILABLE_TRANSFORMERS, DEFAULT_PROJECTION_PARAMETERS
 from utils.conf import MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, DEBUG_ENV, \
-    APP_PORT, HS_CLUSTER_ADDRESS, GRPC_PROXY_ADDRESS, EMBEDDING_FIELD
+    APP_PORT, HS_CLUSTER_ADDRESS, GRPC_PROXY_ADDRESS
 from utils.data_management import S3Manager, update_record, \
-    get_mongo_client, valid_embedding_model
+    get_mongo_client, model_has_embeddings, get_production_subsample, get_training_data_path
 from utils.data_management import get_record
 
 with open("version") as f:

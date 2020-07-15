@@ -1,4 +1,3 @@
-import json
 import sys
 from datetime import datetime
 from typing import List, Optional, Tuple
@@ -6,7 +5,6 @@ from typing import List, Optional, Tuple
 import hydro_serving_grpc as hs_grpc
 import numpy as np
 import pandas as pd
-import requests
 from celery.exceptions import Ignore
 from hydrosdk.cluster import Cluster
 from hydrosdk.modelversion import ModelVersion
@@ -19,31 +17,12 @@ from conf import MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, H
     HS_CLUSTER_ADDRESS, GRPC_PROXY_ADDRESS, TaskStates
 from data_management import get_record, parse_embeddings_from_dataframe, parse_requests_dataframe, \
     update_record, get_mongo_client, get_production_subsample, compute_training_embeddings, model_has_embeddings, \
-    calcualte_neighbours
+    calcualte_neighbours, get_training_data_path
 from ml_transformers.autoembeddings import AutoEmbeddingsEncoder, dataframe_to_feature_map, TransformationType, \
     NUMERICAL_TRANSFORMS
 from ml_transformers.transformer import transform_high_dimensional, transform_high_dimensional_mixed, \
     UmapTransformerWithMixedTypes
 from ml_transformers.utils import VisMetrics, DEFAULT_PROJECTION_PARAMETERS
-
-
-def get_training_data_path(model: ModelVersion) -> str:
-    """
-
-    :param model:
-    :return:
-    """
-    response = requests.get(f'{HS_CLUSTER_ADDRESS}/monitoring/training_data?modelVersionId={model.id}')
-    training_data_s3 = json.loads(response.text)
-    if training_data_s3:
-        return training_data_s3[0]
-    else:
-        return ''
-
-
-def get_production_data_sample(model_id, sample_size=1000) -> pd.DataFrame:
-    response = requests.get(f'{HS_CLUSTER_ADDRESS}/monitoring/checks/subsample/{model_id}?size={sample_size}')
-    return pd.DataFrame.from_dict(response.json())
 
 
 def get_embeddings(production_df: pd.DataFrame, training_df: pd.DataFrame, training_data_sample_size: int,
@@ -76,7 +55,8 @@ def get_embeddings(production_df: pd.DataFrame, training_df: pd.DataFrame, train
 
 
 def generate_auto_embeddings(production_data: pd.DataFrame, training_data: pd.DataFrame, model: ModelVersion,
-                             encoder: Optional[AutoEmbeddingsEncoder]) -> Tuple[List[np.array], List[np.array], AutoEmbeddingsEncoder]:
+                             encoder: Optional[AutoEmbeddingsEncoder]) -> Tuple[
+    List[np.array], List[np.array], AutoEmbeddingsEncoder]:
     """
 
     :param training_data:
@@ -90,6 +70,7 @@ def generate_auto_embeddings(production_data: pd.DataFrame, training_data: pd.Da
     used_inputs = training_data.columns.intersection(input_names)
     training_feature_map = dataframe_to_feature_map(training_data[used_inputs], model)
     production_feature_map = dataframe_to_feature_map(production_data[used_inputs], model)
+    logging.info(f'Feature map: {training_feature_map.keys()}')
     if len(training_feature_map) == 0 or len(production_feature_map) == 0:
         return None, None  # not enough data
 
@@ -205,7 +186,8 @@ def transform_task(self, method, model_version_id):
         logging.info('Generating autoembeddings')
         [production_numerical_embeddings, production_categorical_embeddings], \
         [training_numerical_embeddings, training_categorical_embeddings], \
-        autoembeddings_encoder = generate_auto_embeddings(production_requests_df, training_df, model, encoder=autoembeddings_encoder)
+        autoembeddings_encoder = generate_auto_embeddings(production_requests_df, training_df, model,
+                                                          encoder=autoembeddings_encoder)
 
         if training_numerical_embeddings is not None and training_categorical_embeddings is None:  # Only numerical features are used
             production_embeddings, training_embeddings = production_numerical_embeddings, training_numerical_embeddings
@@ -226,8 +208,9 @@ def transform_task(self, method, model_version_id):
     monitoring_models_conf = [(metric.name, metric.config.threshold_op, metric.config.threshold) for metric in
                               MetricSpec.list_for_model(hs_cluster, model.id)]
 
-    if type(training_embeddings) == np.array:  # not mixed-type data
+    if isinstance(training_embeddings, np.ndarray):  # not mixed-type data
         logging.info('Fitting simple')
+        logging.info(f'{production_embeddings.shape}, {training_embeddings.shape}')
         top_N_neighbours = calcualte_neighbours(production_embeddings)
         plottable_result, transformer = transform_high_dimensional(method, parameters,
                                                                    training_embeddings, production_embeddings,
@@ -235,6 +218,8 @@ def transform_task(self, method, model_version_id):
                                                                    vis_metrics=vis_metrics)
     else:  # mixed-type data
         logging.info('Fitting mixed')
+        logging.info(f'{production_embeddings[0].shape}, {training_embeddings[0].shape}')
+        logging.info(f'len prod:{len(production_embeddings)}, len training: {len(training_embeddings)}')
         top_N_neighbours = []
         plottable_result, transformer = transform_high_dimensional_mixed(method, parameters,
                                                                          training_embeddings, production_embeddings)
@@ -251,7 +236,8 @@ def transform_task(self, method, model_version_id):
         e = sys.exc_info()[1]
         logging.error(f'Couldn\'t save result to {path_to_result_file}: {e}')
 
-    if type(transformer) != UmapTransformerWithMixedTypes:  # UmapTransformerWithMixedTypes is used only with fit_transform
+    if type(
+            transformer) != UmapTransformerWithMixedTypes:  # UmapTransformerWithMixedTypes is used only with fit_transform
         transformer_path = s3_model_path + f'/transformer_{method}_{model_name}{model_version}'
         try:
             transformer_saved_to_s3 = s3manager.dump_with_joblib(transformer,

@@ -127,11 +127,11 @@ class S3Manager:
             return None
         with self.fs.open(clean_path, 'rb') as f:
             try:
-                object = joblib.load(f)
+                loaded_object = joblib.load(f)
             except Exception as e:
                 logging.error(f'Couldn\'t load joblib file: {filepath}. Error: {e}')
                 return None
-            return object
+            return loaded_object
 
 
 def calcualte_neighbours(embeddings: np.array) -> List[List[int]]:
@@ -270,7 +270,6 @@ def get_production_subsample(model_id, size=1000) -> pd.DataFrame:
         return pd.DataFrame()
     return pd.DataFrame.from_dict(r.json())
 
-
 def model_has_embeddings(model: ModelVersion) -> [bool]:
     """
     TODO add embedding field shape check
@@ -282,3 +281,17 @@ def model_has_embeddings(model: ModelVersion) -> [bool]:
     if EMBEDDING_FIELD not in output_names:
         return False
     return True
+
+
+def get_training_data_path(model: ModelVersion) -> str:
+    """
+
+    :param model:
+    :return:
+    """
+    response = requests.get(f'{HS_CLUSTER_ADDRESS}/monitoring/training_data?modelVersionId={model.id}')
+    training_data_s3 = json.loads(response.text)
+    if training_data_s3:
+        return training_data_s3[0]
+    else:
+        return ''

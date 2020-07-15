@@ -32,6 +32,8 @@ PROFILE_TYPE_TO_TRANSFORMATION = {ProfilingType.NONE: TransformationType.IGNORE,
                                   ProfilingType.AUDIO: TransformationType.IGNORE,
                                   ProfilingType.TEXT: TransformationType.IGNORE}
 
+NOT_IGNORED_PROFILE_TYPES = [k for k, v in PROFILE_TYPE_TO_TRANSFORMATION.items() if v != TransformationType.IGNORE]
+
 
 class AutoEmbeddingsEncoder:
 

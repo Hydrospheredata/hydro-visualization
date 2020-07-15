@@ -15,10 +15,11 @@ from hydrosdk.servable import Servable
 from loguru import logger as logging
 from pymongo import MongoClient
 
-from conf import AWS_STORAGE_ENDPOINT, HS_CLUSTER_ADDRESS, HYDRO_VIS_BUCKET_NAME, EMBEDDING_FIELD, \
-    N_NEIGHBOURS
+from ml_transformers.transformer import Transformer
 from ml_transformers.utils import DEFAULT_TRANSFORMER_PARAMETERS, Coloring, get_top_N_neighbours, \
     DEFAULT_PROJECTION_PARAMETERS
+from utils.conf import AWS_STORAGE_ENDPOINT, HS_CLUSTER_ADDRESS, HYDRO_VIS_BUCKET_NAME, EMBEDDING_FIELD, \
+    N_NEIGHBOURS
 
 
 def get_mongo_client(mongo_url, mongo_port, mongo_user, mongo_pass, mongo_auth_db):
@@ -214,7 +215,7 @@ def parse_embeddings_from_dataframe(df):
     return embeddings
 
 
-def get_record(db, method, model_version_id: str) -> Dict:
+def get_record(db, method, model_version_id: [str, int]) -> Dict:
     model_version_id = str(model_version_id)
     existing_record = db[method].find_one({"model_version_id": model_version_id})
     if not existing_record:

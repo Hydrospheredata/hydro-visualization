@@ -13,9 +13,9 @@ from hydrosdk.servable import Servable
 from loguru import logger as logging
 
 from app import celery, s3manager
-from conf import MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, HYDRO_VIS_BUCKET_NAME, \
+from utils.conf import MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, HYDRO_VIS_BUCKET_NAME, \
     HS_CLUSTER_ADDRESS, GRPC_PROXY_ADDRESS, TaskStates
-from data_management import get_record, parse_embeddings_from_dataframe, parse_requests_dataframe, \
+from utils.data_management import get_record, parse_embeddings_from_dataframe, parse_requests_dataframe, \
     update_record, get_mongo_client, get_production_subsample, compute_training_embeddings, model_has_embeddings, \
     calcualte_neighbours, get_training_data_path
 from ml_transformers.autoembeddings import AutoEmbeddingsEncoder, dataframe_to_feature_map, TransformationType, \
@@ -106,6 +106,7 @@ def transform_task(self, method, model_version_id):
 
     s3_model_path = f's3://{HYDRO_VIS_BUCKET_NAME}/{model_version_id}'  # TODO make management of S3 bucket storage to check if model in storage is correct
     s3manager.fs.mkdirs(s3_model_path, exist_ok=True)
+
     db_model_info = get_record(db, method, model_version_id)
     parameters = db_model_info.get('parameters', {})
     path_to_transformer = db_model_info.get('transformer_file', '')

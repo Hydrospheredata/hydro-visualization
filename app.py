@@ -12,13 +12,12 @@ from hydrosdk.modelversion import ModelVersion
 from jsonschema import Draft7Validator
 from loguru import logger as logging
 
-from conf import MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, DEBUG_ENV, \
-    APP_PORT, GRPC_PROXY_ADDRESS
-from data_management import S3Manager, update_record, \
-    get_mongo_client, model_has_embeddings, get_production_subsample, get_training_data_path
-from data_management import get_record
-from ml_transformers.autoembeddings import NOT_IGNORED_PROFILE_TYPES
 from ml_transformers.utils import AVAILABLE_TRANSFORMERS, DEFAULT_PROJECTION_PARAMETERS
+from utils.conf import MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, DEBUG_ENV, \
+    APP_PORT, HS_CLUSTER_ADDRESS, GRPC_PROXY_ADDRESS, EMBEDDING_FIELD
+from utils.data_management import S3Manager, update_record, \
+    get_mongo_client, valid_embedding_model
+from utils.data_management import get_record
 
 with open("version") as f:
     VERSION = f.read().strip()
@@ -30,7 +29,8 @@ with open("version") as f:
         "pythonVersion": sys.version
     }
 
-with open('./hydro-vis-params-json-schema.json') as f:
+
+with open('utils/hydro-vis-params-json-schema.json') as f:
     REQUEST_JSON_SCHEMA = json.load(f)
     params_validator = Draft7Validator(REQUEST_JSON_SCHEMA)
 
@@ -149,7 +149,7 @@ def supported():
 
     model_version_id = request.args.get('model_version_id')
     try:
-        hs_cluster = Cluster(http_address='http://managerui:8080', grpc_address=GRPC_PROXY_ADDRESS)
+        hs_cluster = Cluster(HS_CLUSTER_ADDRESS, grpc_address=GRPC_PROXY_ADDRESS)
         model = ModelVersion.find_by_id(hs_cluster, int(model_version_id))
     except ValueError as e:
         logging.info(e)
@@ -177,6 +177,7 @@ def supported():
                     "message": f"Model should have at least 2 scalar fields with one of these profiling types: {[profiling.name for profiling in NOT_IGNORED_PROFILE_TYPES]}."}
 
     return {"supported": True}
+
 
 
 @app.route(PREFIX + '/params/<method>', methods=['POST'])

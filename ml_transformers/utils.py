@@ -14,16 +14,12 @@ class Coloring(Enum):
 
 
 class VisMetrics(Enum):
-    global_score = 'global_score',
-    sammon_error = 'sammon_error',
-    auc_score = 'auc_score',
-    stability = 'stability',
-    msid = 'msid',
-    clustering = 'clustering'
-
-    @classmethod
-    def has_key(cls, name):
-        return any(x for x in cls if x.name == name)
+    GLOBAL_SCORE = 'global_score'
+    SAMMON_ERROR = 'sammon_error'
+    AUC_SCORE = 'auc_score'
+    STABILITY = 'stability'
+    MSID = 'msid'
+    CLUSTERING = 'clustering'
 
     @classmethod
     def has_val(cls, value):
@@ -62,10 +58,10 @@ def get_top_N_neighbours(X, N=50) -> List[List[int]]:
     """
     start = datetime.now()
     tree = cKDTree(X)
-    top_100 = []
-    for i in range(len(X)):
-        _, top = tree.query(X[i], k=N + 1)
+    top_N = []
+    for (i, x) in enumerate(X):
+        _, top = tree.query(x, k=N + 1)
         top = np.delete(top, np.where(top == i))
-        top_100.append(top.tolist())
+        top_N.append(top.tolist())
     logging.info(f'TOP 100 neighbour calculation took: {datetime.now() - start}')
-    return top_100
+    return top_N

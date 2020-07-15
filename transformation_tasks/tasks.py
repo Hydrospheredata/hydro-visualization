@@ -150,6 +150,7 @@ def transform_task(self, method, model_version_id):
 
     if path_to_encoder:
         autoembeddings_encoder = s3manager.load_with_joblib(filepath=path_to_encoder)
+        logging.info('Loaded joblib')
     else:
         autoembeddings_encoder = None
 
@@ -236,8 +237,7 @@ def transform_task(self, method, model_version_id):
         e = sys.exc_info()[1]
         logging.error(f'Couldn\'t save result to {path_to_result_file}: {e}')
 
-    if type(
-            transformer) != UmapTransformerWithMixedTypes:  # UmapTransformerWithMixedTypes is used only with fit_transform
+    if type(transformer) != UmapTransformerWithMixedTypes:  # MixedTypes is used only with fit_transform
         transformer_path = s3_model_path + f'/transformer_{method}_{model_name}{model_version}'
         try:
             transformer_saved_to_s3 = s3manager.dump_with_joblib(transformer,
@@ -249,6 +249,16 @@ def transform_task(self, method, model_version_id):
 
         if transformer_saved_to_s3:
             db_model_info['transformer_file'] = transformer_path
+    else:
+        autoembeddings_encoder_path = s3_model_path + f'/autoembeddings_encoder_{method}_{model_name}{model_version}'
+        try:
+            encoder_saved_to_s3 = s3manager.dump_with_joblib(autoembeddings_encoder, filepath=autoembeddings_encoder_path)
+        except:
+            e = sys.exc_info()[1]
+            logging.error(f'Couldn\'t save transformer to {autoembeddings_encoder_path}: {e}')
+            encoder_saved_to_s3 = False
+        if encoder_saved_to_s3:
+            db_model_info['encoder_file'] = autoembeddings_encoder_path
 
     update_record(db, method, db_model_info, model.id)
 

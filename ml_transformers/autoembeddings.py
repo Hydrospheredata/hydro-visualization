@@ -36,9 +36,19 @@ NOT_IGNORED_PROFILE_TYPES = [k for k, v in PROFILE_TYPE_TO_TRANSFORMATION.items(
 
 
 class AutoEmbeddingsEncoder:
+    """
+    Class that implements interface for transforming model data into autoembeddings baased on model inputs profile.
+    It implements sklearn interface fit(), fit_transform(), transform().
+    """
 
     def __init__(self, one_hot_encoder: OneHotEncoder = None, ordinal_encoder: OrdinalEncoder = None,
                  robust_scaler: RobustScaler = None):
+        """
+
+        :param one_hot_encoder:
+        :param ordinal_encoder:
+        :param robust_scaler:
+        """
         self.updated = False
         self.fitted_one_hot, self.fitted_ordinal, self.fitted_robust = False, False, False
         if one_hot_encoder is None or not one_hot_encoder.sparse or one_hot_encoder.handle_unknown != 'ignore':
@@ -62,6 +72,12 @@ class AutoEmbeddingsEncoder:
         self.fitted = self.fitted_one_hot and self.fitted_ordinal and self.fitted_robust
 
     def __fit__(self, transformation_type: TransformationType, features: np.array):
+        """
+        Fits features for only one transformation type
+        :param transformation_type:
+        :param features:
+        :return:
+        """
         if transformation_type == TransformationType.ONE_HOT:
             self.one_hot_encoder.fit(features)
             self.fitted_one_hot = True
@@ -76,6 +92,12 @@ class AutoEmbeddingsEncoder:
             self.updated = True
 
     def __transform__(self, transformation_type: TransformationType, features: np.array) -> np.array:
+        """
+        Transforms features of certain transformation type using specific encoder/transformer
+        :param transformation_type:
+        :param features:
+        :return:
+        """
         transformed = features
         if transformation_type == TransformationType.ONE_HOT:
             try:
@@ -98,6 +120,12 @@ class AutoEmbeddingsEncoder:
         return transformed
 
     def __fit_transform__(self, transformation_type: TransformationType, features: np.array) -> np.array:
+        """
+        Does fit_trainsform on features with certain transformation type
+        :param transformation_type:
+        :param features:
+        :return:
+        """
         transformed = features
         if transformation_type == TransformationType.ONE_HOT:
             transformed = self.one_hot_encoder.fit_transform(features)
@@ -114,10 +142,20 @@ class AutoEmbeddingsEncoder:
         return transformed
 
     def fit(self, feature_map: Dict[TransformationType, np.array]):
+        """
+        Fits features map - mapping from transformation type and corresponding features
+        :param feature_map:
+        :return:
+        """
         for transformation_type, features in feature_map.items():
             self.__fit__(transformation_type, features)
 
     def fit_transform(self, feature_map: Dict[TransformationType, np.array]) -> Dict[TransformationType, np.array]:
+        """
+        fits and transforms feature map - mapping from transformation type and corresponding features
+        :param feature_map:
+        :return:
+        """
         transformation_result: Dict[TransformationType, np.array] = {}
         for transformation_type, features in feature_map.items():
             transformed_features = self.__fit_transform__(transformation_type, features)
@@ -125,6 +163,11 @@ class AutoEmbeddingsEncoder:
         return transformation_result
 
     def transform(self, feature_map: Dict[TransformationType, np.array]) -> Dict[TransformationType, np.array]:
+        """
+        Transforms features map - mapping from transformation type and corresponding features
+        :param feature_map:
+        :return:
+        """
         transformation_result: Dict[TransformationType, np.array] = {}
         for transformation_type, features in feature_map.items():
             transformed_features = self.__transform__(transformation_type, features)
@@ -135,10 +178,12 @@ class AutoEmbeddingsEncoder:
 def dataframe_to_feature_map(inputs_dataframe: pd.DataFrame, model: ModelVersion) -> Dict[
     TransformationType, np.array]:
     """
-
+    Parses dataframe data to feature map
+    Feature map - mapping from transformation type and correspinding features that will be transformed using this transformation type.
+    To define transformation type inputs profiles are used. Mapping ProfileType -> TransformationType is defined in PROFILE_TYPE_TO_TRANSFORMATION dict
     :param inputs_dataframe: Dataframe with model inputs as columns
     :param model: hydrosphere model version id
-    :return:
+    :return: feature map:  Dict[TransformationType, np.array]
     """
     model_inputs = list(model.contract.predict.inputs)
     scalar_inputs = list(filter((lambda inpt: len(inpt.shape.dim) == 0), model_inputs))

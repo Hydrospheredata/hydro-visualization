@@ -127,6 +127,10 @@ class UmapTransformer(Transformer):
 
 
 class UmapTransformerWithMixedTypes(UmapTransformer):
+    """
+    Special instance of umap transformer with handling of two transformers for numerical and categorical data.
+    """
+
     def __init__(self, parameters):
         super().__init__(parameters)
         self.default_parameters = DEFAULT_TRANSFORMER_PARAMETERS['umap_mixed']
@@ -198,27 +202,35 @@ class UmapTransformerWithMixedTypes(UmapTransformer):
             return embedding
 
     def transform(self, X, X_categorical=None, y=None):
+        """
+        Is not implemented since UMAP doesn't have this functionality for graph intersetions
+        """
         raise NotImplementedError(f'{self.__class__.__name__} cannot transform data. Use fit_transform() instead.')
 
     def eval(self, X: np.ndarray, _X: np.ndarray, y=None,
              evaluation_metrics: Tuple[VisMetrics] = tuple(AVAILBALE_VIS_METRICS),
              _auc_cv=5) -> Dict[str, str]:
+        """
+        Is not implemented since some metrics require complex distance function for mixed-type
+        """
         raise NotImplementedError(f'{self.__class__.__name__} doesn\'t implement evaluation of transformation.')
 
 
-def transform_high_dimensional(method, parameters,
+def transform_high_dimensional(method: str, parameters: Dict,
                                training_embeddings: Optional[np.ndarray],
                                production_embeddings: np.ndarray,
                                transformer_instance: Optional[Transformer] = None,
                                vis_metrics: Tuple[VisMetrics] = tuple(AVAILBALE_VIS_METRICS)) -> Tuple[
     Dict, Transformer]:
     """
-    Transforms data from higher dimensions to lower
+    Transforms data of one type (only numerical or only categorical) from higher dimensions to lower.
+     And calculates vis_metrics of transformation.
     :param method: transformer method
     :param parameters: {}
-    :param training_embeddings:
-    :param production_embeddings:
-    :param transformer_instance:
+    :param training_embeddings: 2D numpy array
+    :param production_embeddings: 2D numpy array
+    :param transformer_instance: Transformer or None. If None then Transformer is created and fit_transform() method is used.
+    If is not None then transform() is used
     :param vis_metrics:
     :return: (embedding dict, transformer)
     """
@@ -267,17 +279,17 @@ def transform_high_dimensional(method, parameters,
     return result, transformer
 
 
-def transform_high_dimensional_mixed(method, parameters,
+def transform_high_dimensional_mixed(method: str, parameters: Dict,
                                      training_embeddings: List[np.ndarray],
-                                     production_embeddings: List[np.ndarray]):
+                                     production_embeddings: List[np.ndarray]) -> Tuple[Dict, Transformer]:
     """
-    Transforms data from higher dimensions to lower
+    Transforms data of mixed type.
+    This method uses only fit_transform method and requires specific transformer that handlex mixed types.
+    It doesn't compute vis_metrics of transformation.
     :param method: transformer method
-    :param parameters: {}
-    :param training_embeddings:
-    :param production_embeddings:
-    :param transformer_instance:
-    :param vis_metrics:
+    :param parameters: Dict
+    :param training_embeddings: List[np.array] has two numpy arrays - [numerical_embeddings, categorical_embeddings]
+    :param production_embeddings: List[np.array] has two numpy arrays - [numerical_embeddings, categorical_embeddings]
     :return: (embedding dict, transformer)
     """
     result = {}

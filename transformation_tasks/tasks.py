@@ -32,7 +32,6 @@ def get_embeddings(production_df: pd.DataFrame, training_df: pd.DataFrame, train
         training_embeddings = None
     else:
         try:
-            logging.info('Creating servable')
             manager_stub = hs_grpc.manager.ManagerServiceStub(channel=hs_cluster.channel)
             deploy_request = hs_grpc.manager.DeployServableRequest(version_id=model.id,
                                                                    metadata={"created_by": "hydro_vis"})
@@ -70,7 +69,6 @@ def generate_auto_embeddings(production_data: pd.DataFrame, training_data: pd.Da
     used_inputs = training_data.columns.intersection(input_names)
     training_feature_map = dataframe_to_feature_map(training_data[used_inputs], model)
     production_feature_map = dataframe_to_feature_map(production_data[used_inputs], model)
-    logging.info(f'Feature map: {training_feature_map.keys()}')
     if len(training_feature_map) == 0 or len(production_feature_map) == 0:
         return None, None  # not enough data
 
@@ -129,7 +127,6 @@ def transform_task(self, method, model_version_id):
                                                     DEFAULT_PROJECTION_PARAMETERS['production_data_sample_size'])
 
     try:
-        logging.info(f'Connecting to cluster')
         hs_cluster = Cluster(HS_CLUSTER_ADDRESS, grpc_address=GRPC_PROXY_ADDRESS)
         model = ModelVersion.find_by_id(hs_cluster, int(model_version_id))
         model_name = model.name

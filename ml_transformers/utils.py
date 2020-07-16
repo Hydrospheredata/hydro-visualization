@@ -45,7 +45,7 @@ DEFAULT_TRANSFORMER_PARAMETERS = {'umap':
 
 DEFAULT_PROJECTION_PARAMETERS = {'parameters': DEFAULT_TRANSFORMER_PARAMETERS,
                                  'use_labels': False,
-                                 'visualization_metrics': [VisMetrics.global_score.name],
+                                 'visualization_metrics': [VisMetrics.GLOBAL_SCORE.value],
                                  'training_data_sample_size': 5000,
                                  'production_data_sample_size': 500}
 

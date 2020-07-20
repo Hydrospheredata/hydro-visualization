@@ -1,8 +1,7 @@
 import json
 import sys
 from typing import List
-
-import git
+import json
 from celery import Celery
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -18,15 +17,8 @@ from utils.data_management import S3Manager, update_record, \
     get_mongo_client, valid_embedding_model
 from utils.data_management import get_record
 
-with open("version") as f:
-    VERSION = f.read().strip()
-    repo = git.Repo(".")
-    BUILDINFO = {
-        "version": VERSION,
-        "gitHeadCommit": repo.active_branch.commit.hexsha,
-        "gitCurrentBranch": repo.active_branch.name,
-        "pythonVersion": sys.version
-    }
+with open("buildinfo.json") as f:
+    BUILDINFO = json.load(f)
 
 
 with open('utils/hydro-vis-params-json-schema.json') as f:

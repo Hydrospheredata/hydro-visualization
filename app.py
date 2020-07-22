@@ -18,6 +18,7 @@ from utils.conf import MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH
 from utils.data_management import S3Manager, update_record, \
     get_mongo_client, valid_embedding_model
 from utils.data_management import get_record
+from utils.logs import disable_logging
 
 fileConfig("logging_config.ini")
 
@@ -33,7 +34,7 @@ mongo_client = get_mongo_client(MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, M
 
 db = mongo_client['visualization']
 
-s3manager = S3Manager()
+s3manager = None # S3Manager()
 
 app = Flask(__name__)
 PREFIX = '/visualization'
@@ -69,14 +70,14 @@ celery.conf.update({"CELERY_DISABLE_RATE_LIMITS": True})
 
 import transformation_tasks
 
-@utils.disable_logging
 @app.route(PREFIX + "/health", methods=['GET'])
+@disable_logging
 def hello():
     return "Hi! I am Visualization service"
 
 
-@utils.disable_logging
 @app.route(PREFIX + "/buildinfo", methods=['GET'])
+@disable_logging
 def buildinfo():
     return jsonify(BUILDINFO)
 

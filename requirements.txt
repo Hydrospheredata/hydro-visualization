@@ -7,7 +7,6 @@ hydrosdk~=2.3.0rc2
 git+https://github.com/xgfs/msid.git@292de7cf378a544209e3f146ae3bb8b7900b9e77
 boto3==1.12.34
 Pillow==7.1.2
-loguru==0.4.1
 flask_cors
 pymongo==3.10.1
 s3fs==0.4.2

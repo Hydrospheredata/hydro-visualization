@@ -12,7 +12,7 @@ import requests
 import s3fs
 from hydrosdk.modelversion import ModelVersion
 from hydrosdk.servable import Servable
-from loguru import logger as logging
+import logging
 from pymongo import MongoClient
 
 from ml_transformers.transformer import Transformer

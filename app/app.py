@@ -1,5 +1,3 @@
-import json
-import sys
 from typing import List
 import json
 from celery import Celery
@@ -10,12 +8,29 @@ from hydrosdk.modelversion import ModelVersion
 from jsonschema import Draft7Validator
 from loguru import logger as logging
 
-from app.ml_transformers.utils import AVAILABLE_TRANSFORMERS, DEFAULT_PROJECTION_PARAMETERS
-from app.utils.conf import MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, DEBUG_ENV, \
+from ml_transformers.utils import AVAILABLE_TRANSFORMERS, DEFAULT_PROJECTION_PARAMETERS
+from utils.conf import MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, DEBUG_ENV, \
     APP_PORT, HS_CLUSTER_ADDRESS, GRPC_PROXY_ADDRESS, EMBEDDING_FIELD
-from app.utils.data_management import S3Manager, update_record, \
+from utils.data_management import S3Manager, update_record, \
     get_mongo_client, valid_embedding_model
-from app.utils.data_management import get_record
+from utils.data_management import get_record
+import json
+from typing import List
+
+from celery import Celery
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+from hydrosdk.cluster import Cluster
+from hydrosdk.modelversion import ModelVersion
+from jsonschema import Draft7Validator
+from loguru import logger as logging
+
+from ml_transformers.utils import AVAILABLE_TRANSFORMERS, DEFAULT_PROJECTION_PARAMETERS
+from utils.conf import MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, DEBUG_ENV, \
+    APP_PORT, HS_CLUSTER_ADDRESS, GRPC_PROXY_ADDRESS, EMBEDDING_FIELD
+from utils.data_management import S3Manager, update_record, \
+    get_mongo_client, valid_embedding_model
+from utils.data_management import get_record
 
 with open("buildinfo.json") as f:
     BUILDINFO = json.load(f)

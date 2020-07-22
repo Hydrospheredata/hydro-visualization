@@ -9,7 +9,6 @@ import requests
 from celery.exceptions import Ignore
 from hydrosdk.cluster import Cluster
 from hydrosdk.modelversion import ModelVersion
-from hydrosdk.monitoring import MetricSpec
 from hydrosdk.servable import Servable
 from loguru import logger as logging
 
@@ -118,8 +117,7 @@ def transform_task(self, method, model_version_id):
         raise Ignore()
 
     production_embeddings = parse_embeddings_from_dataframe(production_requests_df)
-    monitoring_models_conf = [(metric.name, metric.config.threshold_op, metric.config.threshold) for metric in
-                              MetricSpec.list_for_model(hs_cluster, model.id)]
+
     requests_data_dict = parse_requests_dataframe(production_requests_df, monitoring_models_conf, production_embeddings)
 
     logging.info(f'Parsed requests data shape: {production_embeddings.shape}')

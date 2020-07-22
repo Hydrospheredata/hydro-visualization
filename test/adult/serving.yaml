@@ -69,6 +69,10 @@ contract:
         shape: scalar
         type: int64
         profile: numerical
+    kek:
+      shape: scalar
+      type: int64
+      profile: categorical
   outputs:
     value:
       shape: scalar
@@ -148,6 +152,10 @@ contract:
       shape: scalar
       type: int64
       profile: numerical
+    kek:
+      shape: scalar
+      type: int64
+      profile: categorical
 monitoring:
   - name: outlier_score
     config:

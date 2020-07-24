@@ -308,6 +308,29 @@ components:
       - clustering
 
 
+    OneOutputInfo:
+      type: object
+      properties:
+        coloring_type:
+          type: string
+        data:
+          type: array
+          items:
+            anyOf:
+              - type: number
+              - type: string
+              - type: integer
+        dtype:
+          type: integer
+        classes:
+          anyOf:
+              - type: number
+              - type: string
+              - type: integer
+      required:
+        - colorint_type
+        - data
+        - dtype
 
 
     TaskResponse:
@@ -348,41 +371,11 @@ components:
           type: array
           items:
             type: integer
-        class_labels:
+        output_info:
           type: object
-          properties:
-            confidences:
-              type: object
-              properties:
-                classes:
-                  type: array
-                  items:
-                    type: number
-                coloring_type:
-                  type: string
-                data:
-                  type: array
-                  items:
-                    type: number
-              required:
-                - coloring_type
-                - data
-            class:
-              type: object
-              properties:
-                classes:
-                  type: array
-                  items:
-                    type: number
-                coloring_type:
-                  type: string
-                data:
-                  type: array
-                  items:
-                    type: number
-              required:
-                - coloring_type
-                - data
+          description: key is output name, value is it's info - values, coloring and dtype
+          additionalProperties:
+             $ref: '#/components/schemas/OneOutputInfo'
         visualization_metrics:
           type: object
           properties:

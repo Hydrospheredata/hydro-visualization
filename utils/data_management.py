@@ -204,8 +204,7 @@ def parse_requests_dataframe(df, hs_cluster: Cluster, model: ModelVersion, embed
             monitoring_data[monitoring_metric_name] = metric_data
 
     for (monitoring_metric_name, comparison_operator, threshold) in monitoring_fields:
-        monitoring_data[monitoring_metric_name].update(
-            get_coloring_info(pd.Series(monitoring_data[monitoring_metric_name]['scores'])))
+        monitoring_data[monitoring_metric_name].update({ 'coloring_type': Coloring.GRADIENT.value})
 
     return {'output_info': output_info,
             'metrics': monitoring_data,

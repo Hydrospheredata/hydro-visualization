@@ -118,7 +118,7 @@ def transform_task(self, method, model_version_id):
 
     production_embeddings = parse_embeddings_from_dataframe(production_requests_df)
 
-    requests_data_dict = parse_requests_dataframe(production_requests_df, monitoring_models_conf, production_embeddings)
+    requests_data_dict = parse_requests_dataframe(production_requests_df, hs_cluster, model, production_embeddings)
 
     logging.info(f'Parsed requests data shape: {production_embeddings.shape}')
 

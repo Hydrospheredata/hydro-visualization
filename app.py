@@ -9,6 +9,7 @@ from flask_cors import CORS
 from hydrosdk.cluster import Cluster
 from hydrosdk.modelversion import ModelVersion
 from jsonschema import Draft7Validator
+from waitress import serve
 
 from logging.config import fileConfig
 
@@ -250,4 +251,7 @@ def model_status():
 
 
 if __name__ == "__main__":
-    app.run(debug=DEBUG_ENV, host='0.0.0.0', port=APP_PORT)
+    if not DEBUG_ENV:
+        serve(app, host='0.0.0.0', port=APP_PORT)
+    else:
+        app.run(debug=True, host='0.0.0.0', port=APP_PORT)

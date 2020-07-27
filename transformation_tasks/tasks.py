@@ -55,7 +55,7 @@ def get_embeddings(production_df: pd.DataFrame, training_df: pd.DataFrame, train
 
 def generate_auto_embeddings(production_data: pd.DataFrame, training_data: pd.DataFrame, model: ModelVersion,
                              encoder: Optional[AutoEmbeddingsEncoder]) -> Tuple[
-    List[np.array], List[np.array], AutoEmbeddingsEncoder]:
+    Optional[List[np.array]], Optional[List[np.array]], Optional[AutoEmbeddingsEncoder]]:
     """
 
     :param training_data:
@@ -69,8 +69,10 @@ def generate_auto_embeddings(production_data: pd.DataFrame, training_data: pd.Da
     used_inputs = training_data.columns.intersection(input_names)
     training_feature_map = dataframe_to_feature_map(training_data[used_inputs], model)
     production_feature_map = dataframe_to_feature_map(production_data[used_inputs], model)
-    if len(training_feature_map) == 0 or len(production_feature_map) == 0:
-        return None, None  # not enough data
+
+    if (training_feature_map is None or production_feature_map is None) or (
+            len(training_feature_map) == 0 or len(production_feature_map) == 0):
+        return None, None, None  # not enough data
 
     if encoder is None:
         encoder = AutoEmbeddingsEncoder()
@@ -241,7 +243,8 @@ def transform_task(self, method, model_version_id):
     else:
         autoembeddings_encoder_path = s3_model_path + f'/autoembeddings_encoder_{method}_{model_name}{model_version}'
         try:
-            encoder_saved_to_s3 = s3manager.dump_with_joblib(autoembeddings_encoder, filepath=autoembeddings_encoder_path)
+            encoder_saved_to_s3 = s3manager.dump_with_joblib(autoembeddings_encoder,
+                                                             filepath=autoembeddings_encoder_path)
         except:
             e = sys.exc_info()[1]
             logging.error(f'Couldn\'t save transformer to {autoembeddings_encoder_path}: {e}')

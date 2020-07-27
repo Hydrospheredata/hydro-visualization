@@ -153,16 +153,17 @@ def supported():
         hs_cluster = Cluster(HS_CLUSTER_ADDRESS, grpc_address=GRPC_PROXY_ADDRESS)
         model = ModelVersion.find_by_id(hs_cluster, int(model_version_id))
     except ValueError as e:
-        logging.info(e)
+        logging.error(f'Couldn\'t find model {model.name}v{model.version}. Error: {e}')
         return {"supported": False, "message": f"Unable to find {model_version_id}"}, 200
     except Exception as e:
-        logging.info(e)
+        logging.error(f'Couldn\'t check model {model.name}v{model.version}. Error: {e}')
         return {"supported": False, "message": f"Could not check if model {model_version_id} is valid. Error: {e}"}, 200
     try:
         prod_subsample = get_production_subsample(model_version_id, size=10)
         if prod_subsample.empty:
             return {"supported": False, "message": "No production data."}
     except Exception as e:
+        logging.error(f'Couldn\'t get production subsample. Error: {e}')
         return {"supported": False, "message": "Couldn't check production data."}
     training_data_path = get_training_data_path(model)
     embeddings_exist = model_has_embeddings(model)

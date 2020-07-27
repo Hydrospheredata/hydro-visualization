@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Dict
+from typing import Dict, Optional
 
 import numpy as np
 import pandas as pd
@@ -49,27 +49,18 @@ class AutoEmbeddingsEncoder:
         :param ordinal_encoder:
         :param robust_scaler:
         """
-        self.updated = False
-        self.fitted_one_hot, self.fitted_ordinal, self.fitted_robust = False, False, False
         if one_hot_encoder is None or not one_hot_encoder.sparse or one_hot_encoder.handle_unknown != 'ignore':
             self.one_hot_encoder = OneHotEncoder(sparse=False, handle_unknown='ignore')
-            self.updated = True
         else:
             self.one_hot_encoder = one_hot_encoder
-            self.fitted_one_hot = True
         if ordinal_encoder is None:
             self.ordinal_encoder = OrdinalEncoder()
-            self.updated = True
         else:
             self.ordinal_encoder = ordinal_encoder
-            self.fitted_ordinal = True
         if robust_scaler is None:
             self.robust_scaler = RobustScaler()
-            self.updated = True
         else:
             self.robust_scaler = robust_scaler
-            self.fitted_robust = True
-        self.fitted = self.fitted_one_hot and self.fitted_ordinal and self.fitted_robust
 
     def __fit__(self, transformation_type: TransformationType, features: np.array):
         """
@@ -80,16 +71,11 @@ class AutoEmbeddingsEncoder:
         """
         if transformation_type == TransformationType.ONE_HOT:
             self.one_hot_encoder.fit(features)
-            self.fitted_one_hot = True
-            self.updated = True
         if transformation_type == TransformationType.ORDINAL:
             self.ordinal_encoder.fit(features)
-            self.fitted_ordinal = True
-            self.updated = True
         if transformation_type == TransformationType.ROBUST:
             self.robust_scaler.fit(features)
-            self.fitted_robust = True
-            self.updated = True
+
 
     def __transform__(self, transformation_type: TransformationType, features: np.array) -> np.array:
         """
@@ -103,19 +89,16 @@ class AutoEmbeddingsEncoder:
             try:
                 transformed = self.one_hot_encoder.transform(features)
             except NotFittedError:
-                self.need_safe = True
                 transformed = self.one_hot_encoder.fit_transform(features)
         if transformation_type == TransformationType.ORDINAL:
             try:
                 transformed = self.ordinal_encoder.transform(features)
             except NotFittedError:
-                self.need_safe = True
                 transformed = self.ordinal_encoder.fit_transform(features)
         if transformation_type == TransformationType.ROBUST:
             try:
                 transformed = self.robust_scaler.transform(features)
             except NotFittedError:
-                self.need_safe = True
                 transformed = self.ordinal_encoder.fit_transform(features)
         return transformed
 
@@ -129,16 +112,10 @@ class AutoEmbeddingsEncoder:
         transformed = features
         if transformation_type == TransformationType.ONE_HOT:
             transformed = self.one_hot_encoder.fit_transform(features)
-            self.fitted_one_hot = True
-            self.updated = True
         if transformation_type == TransformationType.ORDINAL:
             transformed = self.ordinal_encoder.fit_transform(features)
-            self.fitted_ordinal = True
-            self.updated = True
         if transformation_type == TransformationType.ROBUST:
             transformed = self.robust_scaler.fit_transform(features)
-            self.fitted_robust = True
-            self.updated = True
         return transformed
 
     def fit(self, feature_map: Dict[TransformationType, np.array]):
@@ -175,8 +152,8 @@ class AutoEmbeddingsEncoder:
         return transformation_result
 
 
-def dataframe_to_feature_map(inputs_dataframe: pd.DataFrame, model: ModelVersion) -> Dict[
-    TransformationType, np.array]:
+def dataframe_to_feature_map(inputs_dataframe: pd.DataFrame, model: ModelVersion) -> Optional[Dict[
+    TransformationType, np.array]]:
     """
     Parses dataframe data to feature map
     Feature map - mapping from transformation type and correspinding features that will be transformed using this transformation type.
@@ -187,7 +164,8 @@ def dataframe_to_feature_map(inputs_dataframe: pd.DataFrame, model: ModelVersion
     """
     model_inputs = list(model.contract.predict.inputs)
     scalar_inputs = list(filter((lambda inpt: len(inpt.shape.dim) == 0), model_inputs))
-    assert len(scalar_inputs) > 0
+    if not scalar_inputs:
+        return None
     features_map: Dict[TransformationType, np.array] = {}
     for scalar_input in scalar_inputs:
         input_training_data = inputs_dataframe.get(scalar_input.name)

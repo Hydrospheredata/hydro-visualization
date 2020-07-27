@@ -10,7 +10,7 @@ from celery.exceptions import Ignore
 from hydrosdk.cluster import Cluster
 from hydrosdk.modelversion import ModelVersion
 from hydrosdk.servable import Servable
-from loguru import logger as logging
+import logging
 
 from app import celery, s3manager
 from ml_transformers.transformer import transform_high_dimensional

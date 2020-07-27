@@ -1,4 +1,5 @@
 import json
+import logging
 import sys
 from typing import List
 import json
@@ -8,7 +9,9 @@ from flask_cors import CORS
 from hydrosdk.cluster import Cluster
 from hydrosdk.modelversion import ModelVersion
 from jsonschema import Draft7Validator
-from loguru import logger as logging
+from waitress import serve
+
+from logging.config import fileConfig
 
 from ml_transformers.utils import AVAILABLE_TRANSFORMERS, DEFAULT_PROJECTION_PARAMETERS
 from utils.conf import MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, DEBUG_ENV, \
@@ -16,6 +19,9 @@ from utils.conf import MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH
 from utils.data_management import S3Manager, update_record, \
     get_mongo_client, valid_embedding_model
 from utils.data_management import get_record
+from utils.logs import disable_logging
+
+fileConfig("logging_config.ini")
 
 with open("buildinfo.json") as f:
     BUILDINFO = json.load(f)
@@ -29,7 +35,7 @@ mongo_client = get_mongo_client(MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, M
 
 db = mongo_client['visualization']
 
-s3manager = S3Manager()
+s3manager = None # S3Manager()
 
 app = Flask(__name__)
 PREFIX = '/visualization'
@@ -65,13 +71,14 @@ celery.conf.update({"CELERY_DISABLE_RATE_LIMITS": True})
 
 import transformation_tasks
 
-
 @app.route(PREFIX + "/health", methods=['GET'])
+@disable_logging
 def hello():
     return "Hi! I am Visualization service"
 
 
 @app.route(PREFIX + "/buildinfo", methods=['GET'])
+@disable_logging
 def buildinfo():
     return jsonify(BUILDINFO)
 
@@ -244,4 +251,7 @@ def model_status():
 
 
 if __name__ == "__main__":
-    app.run(debug=DEBUG_ENV, host='0.0.0.0', port=APP_PORT)
+    if not DEBUG_ENV:
+        serve(app, host='0.0.0.0', port=APP_PORT)
+    else:
+        app.run(debug=True, host='0.0.0.0', port=APP_PORT)

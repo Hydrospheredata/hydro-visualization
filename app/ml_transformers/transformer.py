@@ -4,8 +4,7 @@ from datetime import datetime
 from typing import Dict, Tuple, Optional
 
 import numpy as np
-from loguru import logger
-from loguru import logger as logging
+import logging
 from umap import UMAP
 
 from .metrics import global_score, sammon_error, stability_score, auc_score, intristic_multiscale_score, \
@@ -150,7 +149,7 @@ def transform_high_dimensional(method, parameters,
         else:
             transformer = UmapTransformer(parameters)
     if transformer is None:
-        logger.error('Cannot define transformer. Illegal method name')
+        logging.error('Cannot define transformer. Illegal method name')
 
     if training_embeddings is not None and production_embeddings is not None:
         total_embeddings = np.concatenate([production_embeddings, training_embeddings])
@@ -163,7 +162,7 @@ def transform_high_dimensional(method, parameters,
     else:
         plottable_embeddings = transformer.fit_transform(
             total_embeddings)  # TODO add ground truth labels management for semi-supervised umap
-    logger.info(
+    logging.info(
         f'Fitting {total_embeddings.shape[0]} {total_embeddings.shape[1]}-dimensional points took '
         f'{datetime.now() - start}')
 

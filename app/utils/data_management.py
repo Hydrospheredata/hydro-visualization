@@ -1,8 +1,9 @@
 import json
+import logging
 import random
 import tempfile
 from time import sleep
-from typing import Dict, Optional, List
+from typing import Dict, Optional, List, Any
 
 import boto3
 import joblib
@@ -15,10 +16,8 @@ from hydrosdk.contract import ModelField, ProfilingType
 from hydrosdk.modelversion import ModelVersion
 from hydrosdk.monitoring import MetricSpec
 from hydrosdk.servable import Servable
-import logging
 from pymongo import MongoClient
 
-from ml_transformers.transformer import Transformer
 from ml_transformers.utils import DEFAULT_TRANSFORMER_PARAMETERS, Coloring, get_top_N_neighbours, \
     DEFAULT_PROJECTION_PARAMETERS
 from utils.conf import AWS_STORAGE_ENDPOINT, HS_CLUSTER_ADDRESS, HYDRO_VIS_BUCKET_NAME, EMBEDDING_FIELD, \
@@ -80,8 +79,7 @@ class S3Manager:
         '''
         Reads json
         If file not found or couldn't parse content, return empty Dict and log error
-        :param bucket_name:
-        :param filename:
+        :param filepath: in format 's3://path-to-file'
         :return: file content or {} in case of error
         '''
         if not self.fs.exists(filepath):
@@ -97,17 +95,15 @@ class S3Manager:
             return {}
         return js_object
 
-    def write_transformer_model(self, transformer, filepath) -> bool:
+    def dump_with_joblib(self, object, filepath) -> bool:
         """
-
-        :param transformer:
-        :param bucket_name:
-        :param filename:
-        :return:
+        :param object:
+        :param filepath: in format 's3://path-to-file'
+        :return: success
         """
         with tempfile.TemporaryFile() as fp:
             try:
-                joblib.dump(transformer, fp)
+                joblib.dump(object, fp)
             except Exception as e:
                 logging.error(f'Couldn\'t dump joblib file: {filepath}. Error: {e}')
                 return False
@@ -120,32 +116,35 @@ class S3Manager:
                 return False
         return True
 
-    def read_transformer_model(self, bucket_name, filename) -> Optional[Transformer]:
+    def load_with_joblib(self, filepath) -> Optional[Any]:
         """
-        Loads pretrained transformer model from S3
+        Loads joblib objects from S3
         if file not found: return None
         if is not joblib file: return None
-        if not Transformer instance: return None
-        :param bucket_name:
-        :param filename:
-        :return: Transformer/None
+        :param filepath: in format 's3://path-to-file'
+        :return: Object/None
         """
-        if not self.fs.exists(f's3://{bucket_name}/{filename}'):
-            logging.error(f'No such file {bucket_name}/{filename}')
+        clean_path = filepath.replace('s3://', '')
+        if not self.fs.exists(filepath):
+            logging.error(f'No such file {filepath}')
             return None
-        with self.fs.open(f'{bucket_name}/{filename}', 'rb') as f:
+        with self.fs.open(clean_path, 'rb') as f:
             try:
-                transformer = joblib.load(f)
+                loaded_object = joblib.load(f)
             except Exception as e:
-                logging.error(f'Couldn\'t load joblib model: {bucket_name}/{filename}')
+                logging.error(f'Couldn\'t load joblib file: {filepath}. Error: {e}')
                 return None
-            if not isinstance(transformer, Transformer):
-                logging.error(f'{bucket_name}/{filename} ({transformer.__class__}) is not Transformer instance. ')
-                return None
-            return transformer
+            return loaded_object
 
 
-def parse_requests_dataframe(df, hs_cluster: Cluster, model: ModelVersion, embeddings: np.ndarray) -> Dict:
+def calcualte_neighbours(embeddings: np.array) -> List[List[int]]:
+    n_neighbours = min(N_NEIGHBOURS + 1, len(embeddings) - 1)
+    top_n_neighbours = get_top_N_neighbours(embeddings, N=n_neighbours)
+    return top_n_neighbours
+
+
+def parse_requests_dataframe(df, hs_cluster: Cluster, model: ModelVersion,
+                             top_n_neighbours: List[List[int]] = []) -> Dict:
     """
     Extracts:
         - model scalar outputs values
@@ -172,21 +171,22 @@ def parse_requests_dataframe(df, hs_cluster: Cluster, model: ModelVersion, embed
         filter(lambda x: len(x.shape.dim) == 0,
                model.contract.predict.outputs))
     requests_ids = df['_id'].values.tolist()
-    N_neighbours = min(N_NEIGHBOURS + 1, len(embeddings) - 1)
-    top_N_neighbours = get_top_N_neighbours(embeddings, N=N_neighbours)
-    counterfactuals = [[] for _ in range(len(top_N_neighbours))]
+
+    counterfactuals = [[] for _ in range(len(top_n_neighbours))]
 
     output_info = {}
     for scalar_output in scalar_model_outputs:
         coloring_type = get_coloring_info(scalar_output)
-        field_info = {'data': df[scalar_output.name].values.tolist(), 'coloring_type': coloring_type.value, 'dtype': scalar_output.dtype}
+        field_info = {'data': df[scalar_output.name].values.tolist(), 'coloring_type': coloring_type.value,
+                      'dtype': scalar_output.dtype}
         if coloring_type == Coloring.CLASS:
             field_info['classes'] = np.unique(df[scalar_output.name].values).tolist()
-        if scalar_output.name == 'class':  #  fixme add counterfactuals by name
+        if scalar_output.name == 'class':  # fixme add counterfactuals by name
             class_labels = df[scalar_output.name].values.tolist()
-            counterfactuals = list(
-                map(lambda i: list(filter(lambda x: class_labels[x] != class_labels[i], top_N_neighbours[i])),
-                    range(len(top_N_neighbours))))
+            if len(top_n_neighbours) > 0:
+                counterfactuals = list(
+                    map(lambda i: list(filter(lambda x: class_labels[x] != class_labels[i], top_n_neighbours[i])),
+                        range(len(top_n_neighbours))))
             del class_labels
         output_info[scalar_output.name] = field_info
 
@@ -204,12 +204,12 @@ def parse_requests_dataframe(df, hs_cluster: Cluster, model: ModelVersion, embed
             monitoring_data[monitoring_metric_name] = metric_data
 
     for (monitoring_metric_name, comparison_operator, threshold) in monitoring_fields:
-        monitoring_data[monitoring_metric_name].update({ 'coloring_type': Coloring.GRADIENT.value})
+        monitoring_data[monitoring_metric_name].update({'coloring_type': Coloring.GRADIENT.value})
 
     return {'output_info': output_info,
             'metrics': monitoring_data,
             'requests_ids': requests_ids,
-            'top_N': top_N_neighbours,
+            'top_N': top_n_neighbours,
             'counterfactuals': counterfactuals}
 
 
@@ -275,7 +275,7 @@ def get_production_subsample(model_id, size=1000) -> pd.DataFrame:
     return pd.DataFrame.from_dict(r.json())
 
 
-def valid_embedding_model(model: ModelVersion) -> [bool]:
+def model_has_embeddings(model: ModelVersion) -> [bool]:
     """
     TODO add embedding field shape check
     Check if model returns embeddings
@@ -286,3 +286,17 @@ def valid_embedding_model(model: ModelVersion) -> [bool]:
     if EMBEDDING_FIELD not in output_names:
         return False
     return True
+
+
+def get_training_data_path(model: ModelVersion) -> str:
+    """
+
+    :param model:
+    :return:
+    """
+    response = requests.get(f'{HS_CLUSTER_ADDRESS}/monitoring/training_data?modelVersionId={model.id}')
+    training_data_s3 = json.loads(response.text)
+    if training_data_s3:
+        return training_data_s3[0]
+    else:
+        return ''

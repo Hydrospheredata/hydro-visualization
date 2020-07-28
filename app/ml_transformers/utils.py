@@ -37,7 +37,10 @@ AVAILBALE_VIS_METRICS = list(VisMetrics)
 
 AVAILABLE_TRANSFORMERS = {'umap'}  # {'umap', 'tsne', 'trimap'}
 DEFAULT_TRANSFORMER_PARAMETERS = {'umap':
-                                      {'min_dist': 0.1, 'n_neighbours': 15, 'metric': 'euclidean', 'n_components': 2}
+                                      {'min_dist': 0.1, 'n_neighbours': 15, 'metric': 'euclidean', 'n_components': 2},
+                                  'umap_mixed':
+                                      {'min_dist': 0.1, 'n_neighbours': 15, 'metric': 'euclidean', 'n_components': 2,
+                                       'categorical_weight': 0.9}
                                   }
 
 DEFAULT_PROJECTION_PARAMETERS = {'parameters': DEFAULT_TRANSFORMER_PARAMETERS,

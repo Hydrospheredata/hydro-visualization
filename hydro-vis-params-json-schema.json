@@ -1,0 +1,170 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema",
+    "$id": "http://example.com/example.json",
+    "type": "object",
+    "title": "The root schema",
+    "description": "The root schema comprises the entire JSON document.",
+    "default": {
+            "parameters": {
+                "metric": "euclidean",
+                "min_dist": 0.1,
+                "n_components": 2,
+                "n_neighbours": 15
+            },
+            "production_data_sample_size": 500,
+            "training_data_sample_size": 5000,
+            "visualization_metrics": [
+                "global_score"
+            ]
+        },
+    "examples": [
+        {
+            "parameters": {
+                "metric": "euclidean",
+                "min_dist": 0.1,
+                "n_components": 2,
+                "n_neighbours": 15
+            },
+            "production_data_sample_size": 500,
+            "training_data_sample_size": 5000,
+            "visualization_metrics": [
+                "global_score"
+            ]
+        }
+    ],
+    "required": [
+        "parameters"
+    ],
+    "additionalProperties": true,
+    "properties": {
+        "parameters": {
+            "$id": "#/properties/parameters",
+            "type": "object",
+            "title": "The parameters schema",
+            "description": "An explanation about the purpose of this instance.",
+            "default": {
+                    "metric": "euclidean",
+                    "min_dist": 0.1,
+                    "n_components": 2,
+                    "n_neighbours": 15
+                },
+            "examples": [
+                {
+                    "metric": "euclidean",
+                    "min_dist": 0.1,
+                    "n_components": 2,
+                    "n_neighbours": 15
+                }
+            ],
+            "required": [
+                "metric",
+                "min_dist",
+                "n_components",
+                "n_neighbours"
+            ],
+            "additionalProperties": true,
+            "properties": {
+                "metric": {
+                    "$id": "#/properties/parameters/properties/metric",
+                    "type": "string",
+                    "title": "The metric schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": "euclidean",
+                    "examples": [
+                        "euclidean"
+                    ]
+                },
+                "min_dist": {
+                    "$id": "#/properties/parameters/properties/min_dist",
+                    "type": "number",
+                    "title": "The min_dist schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": 0.1,
+                    "examples": [
+                        0.1
+                    ],
+                    "maximum": 0.99,
+                    "minimum": 0.0
+                },
+                "n_components": {
+                    "$id": "#/properties/parameters/properties/n_components",
+                    "type": "integer",
+                    "title": "The n_components schema",
+                    "description": "Number of dimensions returned by projector",
+                    "default": 2,
+                    "examples": [
+                        2
+                    ],
+                    "maximum": 3,
+                    "minimum": 2
+                },
+                "n_neighbours": {
+                    "$id": "#/properties/parameters/properties/n_neighbours",
+                    "type": "integer",
+                    "title": "The n_neighbours schema",
+                    "description": "number of neighbours in umap transformer",
+                    "default": 15,
+                    "examples": [
+                        15
+                    ],
+                    "maximum": 200,
+                    "minimum": 2
+                }
+            }
+        },
+        "production_data_sample_size": {
+            "$id": "#/properties/production_data_sample_size",
+            "type": "integer",
+            "title": "The production_data_sample_size schema",
+            "description": "Number of requests to sample from production data.",
+            "default": 500,
+            "examples": [
+                500
+            ],
+            "maximum": 5000,
+            "minimum": 20
+        },
+        "training_data_sample_size": {
+            "$id": "#/properties/training_data_sample_size",
+            "type": "integer",
+            "title": "The training_data_sample_size schema",
+            "description": "Number of training samples sampled from training data",
+            "default": 5000,
+            "examples": [
+                5000
+            ],
+            "maximum": 10000,
+            "minimum": 20
+        },
+        "visualization_metrics": {
+            "$id": "#/properties/visualization_metrics",
+            "type": "array",
+            "title": "The visualization_metrics schema",
+            "description": "Metrics to measure quality of projection",
+            "default": ["global_score"],
+            "examples": [
+                [
+                    "global_score"
+                ]
+            ],
+            "additionalItems": true,
+            "items": {
+                "anyOf": [
+                    {
+                        "$id": "#/properties/visualization_metrics/items/anyOf/0",
+                        "type": "string",
+                        "title": "The first anyOf schema",
+                        "description": "An explanation about the purpose of this instance.",
+                        "default": "global_score",
+                        "examples": [
+                            "global_score"
+                        ]
+                    }
+                ],
+                "$id": "#/properties/visualization_metrics/items",
+                "type": "string"
+            },
+            "uniqueItems": "true"
+        }
+    }
+}

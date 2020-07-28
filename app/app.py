@@ -1,6 +1,4 @@
-import json
 import logging
-import sys
 from typing import List
 import json
 from celery import Celery
@@ -22,8 +20,28 @@ from utils.data_management import S3Manager, update_record, \
     get_mongo_client, model_has_embeddings, get_production_subsample, get_training_data_path
 from utils.data_management import get_record
 from utils.logs import disable_logging
+import json
+import logging
+from logging.config import fileConfig
+from typing import List
 
-fileConfig("logging_config.ini")
+from celery import Celery
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+from hydrosdk.cluster import Cluster
+from hydrosdk.modelversion import ModelVersion
+from jsonschema import Draft7Validator
+from waitress import serve
+
+from ml_transformers.utils import AVAILABLE_TRANSFORMERS, DEFAULT_PROJECTION_PARAMETERS
+from utils.conf import MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, DEBUG_ENV, \
+    APP_PORT, HS_CLUSTER_ADDRESS, GRPC_PROXY_ADDRESS, EMBEDDING_FIELD
+from utils.data_management import S3Manager, update_record, \
+    get_mongo_client, valid_embedding_model
+from utils.data_management import get_record
+from utils.logs import disable_logging
+
+fileConfig("utils/logging_config.ini")
 
 with open("buildinfo.json") as f:
     BUILDINFO = json.load(f)
@@ -37,7 +55,7 @@ mongo_client = get_mongo_client(MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, M
 
 db = mongo_client['visualization']
 
-s3manager = None # S3Manager()
+s3manager = S3Manager()
 
 app = Flask(__name__)
 PREFIX = '/visualization'

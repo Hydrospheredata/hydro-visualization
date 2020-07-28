@@ -28,7 +28,7 @@ ENV GRPC_PORT=5000
 EXPOSE ${GRPC_PORT}
 
 COPY --from=build --chown=app:app /root/.local /home/app/.local
-COPY --chown=app:app . /app
+COPY --chown=app:app app/ /app
 COPY --from=build --chown=app:app buildinfo.json /app/buildinfo.json
 
 WORKDIR /app

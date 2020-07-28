@@ -8,9 +8,8 @@ import pandas as pd
 from celery.exceptions import Ignore
 from hydrosdk.cluster import Cluster
 from hydrosdk.modelversion import ModelVersion
-from hydrosdk.monitoring import MetricSpec
 from hydrosdk.servable import Servable
-from loguru import logger as logging
+import logging
 
 from app import celery, s3manager
 from ml_transformers.autoembeddings import AutoEmbeddingsEncoder, dataframe_to_feature_map, TransformationType, \
@@ -202,8 +201,6 @@ def transform_task(self, method, model_version_id):
                                     'code': 404})
             raise Ignore()
 
-    monitoring_models_conf = [(metric.name, metric.config.threshold_op, metric.config.threshold) for metric in
-                              MetricSpec.list_for_model(hs_cluster, model.id)]
 
     if isinstance(training_embeddings, np.ndarray):  # not mixed-type data
         top_N_neighbours = calcualte_neighbours(production_embeddings)
@@ -216,8 +213,8 @@ def transform_task(self, method, model_version_id):
         plottable_result, transformer = transform_high_dimensional_mixed(method, parameters,
                                                                          training_embeddings, production_embeddings)
 
-    requests_data_dict = parse_requests_dataframe(production_requests_df, monitoring_models_conf,
-                                                  top_N_neighbours)
+
+    requests_data_dict = parse_requests_dataframe(production_requests_df, hs_cluster, model, production_embeddings, top_N_neighbours)
     plottable_result.update(requests_data_dict)
 
     path_to_result_file = s3_model_path + '/result.json'

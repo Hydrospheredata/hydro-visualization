@@ -1,8 +1,8 @@
 import json
+import logging
 import sys
 from typing import List
-
-import git
+import json
 from celery import Celery
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -10,7 +10,9 @@ from hydrosdk.cluster import Cluster
 from hydrosdk.contract import ProfilingType
 from hydrosdk.modelversion import ModelVersion
 from jsonschema import Draft7Validator
-from loguru import logger as logging
+from waitress import serve
+
+from logging.config import fileConfig
 
 from ml_transformers.autoembeddings import NOT_IGNORED_PROFILE_TYPES
 from ml_transformers.utils import AVAILABLE_TRANSFORMERS, DEFAULT_PROJECTION_PARAMETERS
@@ -19,16 +21,12 @@ from utils.conf import MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH
 from utils.data_management import S3Manager, update_record, \
     get_mongo_client, model_has_embeddings, get_production_subsample, get_training_data_path
 from utils.data_management import get_record
+from utils.logs import disable_logging
 
-with open("version") as f:
-    VERSION = f.read().strip()
-    repo = git.Repo(".")
-    BUILDINFO = {
-        "version": VERSION,
-        "gitHeadCommit": repo.active_branch.commit.hexsha,
-        "gitCurrentBranch": repo.active_branch.name,
-        "pythonVersion": sys.version
-    }
+fileConfig("logging_config.ini")
+
+with open("buildinfo.json") as f:
+    BUILDINFO = json.load(f)
 
 
 with open('utils/hydro-vis-params-json-schema.json') as f:
@@ -39,7 +37,7 @@ mongo_client = get_mongo_client(MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, M
 
 db = mongo_client['visualization']
 
-s3manager = S3Manager()
+s3manager = None # S3Manager()
 
 app = Flask(__name__)
 PREFIX = '/visualization'
@@ -75,13 +73,14 @@ celery.conf.update({"CELERY_DISABLE_RATE_LIMITS": True})
 
 import transformation_tasks
 
-
 @app.route(PREFIX + "/health", methods=['GET'])
+@disable_logging
 def hello():
     return "Hi! I am Visualization service"
 
 
 @app.route(PREFIX + "/buildinfo", methods=['GET'])
+@disable_logging
 def buildinfo():
     return jsonify(BUILDINFO)
 
@@ -271,4 +270,7 @@ def model_status():
 
 
 if __name__ == "__main__":
-    app.run(debug=DEBUG_ENV, host='0.0.0.0', port=APP_PORT)
+    if not DEBUG_ENV:
+        serve(app, host='0.0.0.0', port=APP_PORT)
+    else:
+        app.run(debug=True, host='0.0.0.0', port=APP_PORT)

@@ -3,7 +3,7 @@ from enum import Enum
 from typing import List
 
 import numpy as np
-from loguru import logger as logging
+import logging
 from scipy.spatial import cKDTree
 
 

@@ -10,9 +10,12 @@ import numpy as np
 import pandas as pd
 import requests
 import s3fs
+from hydrosdk.cluster import Cluster
+from hydrosdk.contract import ModelField, ProfilingType
 from hydrosdk.modelversion import ModelVersion
+from hydrosdk.monitoring import MetricSpec
 from hydrosdk.servable import Servable
-from loguru import logger as logging
+import logging
 from pymongo import MongoClient
 
 from ml_transformers.utils import DEFAULT_TRANSFORMER_PARAMETERS, Coloring, get_top_N_neighbours, \
@@ -140,50 +143,52 @@ def calcualte_neighbours(embeddings: np.array) -> List[List[int]]:
     return top_n_neighbours
 
 
-def parse_requests_dataframe(df, monitoring_fields: List[Tuple[str, str]],
-                             top_n_neighbours: List[List[int]] = []) -> Dict:
+def parse_requests_dataframe(df, hs_cluster: Cluster, model: ModelVersion, top_n_neighbours: List[List[int]] = []) -> Dict:
     """
     Extracts:
-        - class prediction,
-        - confidence,
-        - other monitoring metrics and thresholds
+        - model scalar outputs values
+        - all model monitoring metrics and thresholds
     from requests dataframe
     :param df: dataframe
     :param monitoring_fields: list of monitoring metrics names with comparison operator
-    :return: Dict {"class_labels":{…}, "metrics":{…}}
+    :return: Dict {"output_info":{…}, "metrics":{…}}
     """
 
-    def get_coloring_info(column: pd.Series) -> Dict:
-        coloring_info = {}
-        if np.issubdtype(column, np.integer):
-            coloring = Coloring.CLASS
-            coloring_info['classes'] = np.unique(column).tolist()
-        elif np.issubdtype(column, np.floating):
-            coloring = Coloring.GRADIENT
+    def get_coloring_info(model_field: ModelField) -> Coloring:
+        if ProfilingType(model_field.profile) in [ProfilingType.CATEGORICAL, ProfilingType.NOMINAL,
+                                                  ProfilingType.ORDINAL]:
+            return Coloring.CLASS
+        elif ProfilingType(model_field.profile) in [ProfilingType.NUMERICAL, ProfilingType.CONTINUOUS,
+                                                    ProfilingType.INTERVAL, ProfilingType.RATIO]:
+            return Coloring.GRADIENT
         else:
-            coloring = Coloring.NONE
-        coloring_info['coloring_type'] = coloring.value
-        return coloring_info
+            return Coloring.NONE
 
+    monitoring_fields = [(metric.name, metric.config.threshold_op, metric.config.threshold) for metric in
+                         MetricSpec.list_for_model(hs_cluster, model.id)]
+    scalar_model_outputs: List[ModelField] = list(
+        filter(lambda x: len(x.shape.dim) == 0,
+               model.contract.predict.outputs))
     requests_ids = df['_id'].values.tolist()
 
     counterfactuals = [[] for _ in range(len(top_n_neighbours))]
-    predictions, confidence = [], []
-    if 'class' in df.columns:
-        predictions = {'data': df['class'].values.tolist()}
-        predictions.update(get_coloring_info(df['class']))
-        class_labels = df['class'].values.tolist()
-        if len(top_n_neighbours) > 0:
-            counterfactuals = list(
-                map(lambda i: list(filter(lambda x: class_labels[x] != class_labels[i], top_n_neighbours[i])),
-                    range(len(top_n_neighbours))))
-        del class_labels
 
-    if 'confidence' in df.columns:
-        confidence = {'data': df['confidence'].values.tolist()}
-        confidence.update(get_coloring_info(df['confidence']))
+    output_info = {}
+    for scalar_output in scalar_model_outputs:
+        coloring_type = get_coloring_info(scalar_output)
+        field_info = {'data': df[scalar_output.name].values.tolist(), 'coloring_type': coloring_type.value,
+                      'dtype': scalar_output.dtype}
+        if coloring_type == Coloring.CLASS:
+            field_info['classes'] = np.unique(df[scalar_output.name].values).tolist()
+        if scalar_output.name == 'class':  # fixme add counterfactuals by name
+            class_labels = df[scalar_output.name].values.tolist()
+            if len(top_n_neighbours) > 0:
+                counterfactuals = list(
+                    map(lambda i: list(filter(lambda x: class_labels[x] != class_labels[i], top_n_neighbours[i])),
+                        range(len(top_n_neighbours))))
+            del class_labels
+        output_info[scalar_output.name] = field_info
 
-    class_info = {'class': predictions, 'confidence': confidence}
 
     monitoring_data = {}
     metric_checks = df._hs_metric_checks.to_list()
@@ -199,10 +204,9 @@ def parse_requests_dataframe(df, monitoring_fields: List[Tuple[str, str]],
             monitoring_data[monitoring_metric_name] = metric_data
 
     for (monitoring_metric_name, comparison_operator, threshold) in monitoring_fields:
-        monitoring_data[monitoring_metric_name].update(
-            get_coloring_info(pd.Series(monitoring_data[monitoring_metric_name]['scores'])))
+        monitoring_data[monitoring_metric_name].update({ 'coloring_type': Coloring.GRADIENT.value})
 
-    return {'class_labels': class_info,
+    return {'output_info': output_info,
             'metrics': monitoring_data,
             'requests_ids': requests_ids,
             'top_N': top_n_neighbours,

@@ -1,6 +1,8 @@
-import logging
-from typing import List
 import json
+import logging
+from logging.config import fileConfig
+from typing import List
+
 from celery import Celery
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -10,35 +12,14 @@ from hydrosdk.modelversion import ModelVersion
 from jsonschema import Draft7Validator
 from waitress import serve
 
-from logging.config import fileConfig
-
 from ml_transformers.autoembeddings import NOT_IGNORED_PROFILE_TYPES
 from ml_transformers.utils import AVAILABLE_TRANSFORMERS, DEFAULT_PROJECTION_PARAMETERS
 from utils.conf import MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, DEBUG_ENV, \
     APP_PORT, HS_CLUSTER_ADDRESS, GRPC_PROXY_ADDRESS
 from utils.data_management import S3Manager, update_record, \
-    get_mongo_client, model_has_embeddings, get_production_subsample, get_training_data_path
+    get_mongo_client
 from utils.data_management import get_record
-from utils.logs import disable_logging
-import json
-import logging
-from logging.config import fileConfig
-from typing import List
-
-from celery import Celery
-from flask import Flask, request, jsonify
-from flask_cors import CORS
-from hydrosdk.cluster import Cluster
-from hydrosdk.modelversion import ModelVersion
-from jsonschema import Draft7Validator
-from waitress import serve
-
-from ml_transformers.utils import AVAILABLE_TRANSFORMERS, DEFAULT_PROJECTION_PARAMETERS
-from utils.conf import MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, DEBUG_ENV, \
-    APP_PORT, HS_CLUSTER_ADDRESS, GRPC_PROXY_ADDRESS, EMBEDDING_FIELD
-from utils.data_management import S3Manager, update_record, \
-    get_mongo_client, valid_embedding_model
-from utils.data_management import get_record
+from utils.data_management import model_has_embeddings, get_production_subsample, get_training_data_path
 from utils.logs import disable_logging
 
 fileConfig("utils/logging_config.ini")

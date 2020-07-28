@@ -1,8 +1,9 @@
 import json
+import logging
 import random
 import tempfile
 from time import sleep
-from typing import Dict, Optional, List, Tuple, Any
+from typing import Dict, Optional, List, Any
 
 import boto3
 import joblib
@@ -15,7 +16,6 @@ from hydrosdk.contract import ModelField, ProfilingType
 from hydrosdk.modelversion import ModelVersion
 from hydrosdk.monitoring import MetricSpec
 from hydrosdk.servable import Servable
-import logging
 from pymongo import MongoClient
 
 from ml_transformers.utils import DEFAULT_TRANSFORMER_PARAMETERS, Coloring, get_top_N_neighbours, \
@@ -143,7 +143,8 @@ def calcualte_neighbours(embeddings: np.array) -> List[List[int]]:
     return top_n_neighbours
 
 
-def parse_requests_dataframe(df, hs_cluster: Cluster, model: ModelVersion, top_n_neighbours: List[List[int]] = []) -> Dict:
+def parse_requests_dataframe(df, hs_cluster: Cluster, model: ModelVersion,
+                             top_n_neighbours: List[List[int]] = []) -> Dict:
     """
     Extracts:
         - model scalar outputs values
@@ -189,7 +190,6 @@ def parse_requests_dataframe(df, hs_cluster: Cluster, model: ModelVersion, top_n
             del class_labels
         output_info[scalar_output.name] = field_info
 
-
     monitoring_data = {}
     metric_checks = df._hs_metric_checks.to_list()
     for (monitoring_metric_name, comparison_operator, threshold) in monitoring_fields:
@@ -204,7 +204,7 @@ def parse_requests_dataframe(df, hs_cluster: Cluster, model: ModelVersion, top_n
             monitoring_data[monitoring_metric_name] = metric_data
 
     for (monitoring_metric_name, comparison_operator, threshold) in monitoring_fields:
-        monitoring_data[monitoring_metric_name].update({ 'coloring_type': Coloring.GRADIENT.value})
+        monitoring_data[monitoring_metric_name].update({'coloring_type': Coloring.GRADIENT.value})
 
     return {'output_info': output_info,
             'metrics': monitoring_data,

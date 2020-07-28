@@ -1,3 +1,4 @@
+import logging
 import sys
 from datetime import datetime
 from typing import List, Optional, Tuple
@@ -9,7 +10,6 @@ from celery.exceptions import Ignore
 from hydrosdk.cluster import Cluster
 from hydrosdk.modelversion import ModelVersion
 from hydrosdk.servable import Servable
-import logging
 
 from app import celery, s3manager
 from ml_transformers.autoembeddings import AutoEmbeddingsEncoder, dataframe_to_feature_map, TransformationType, \
@@ -214,7 +214,7 @@ def transform_task(self, method, model_version_id):
                                                                          training_embeddings, production_embeddings)
 
 
-    requests_data_dict = parse_requests_dataframe(production_requests_df, hs_cluster, model, production_embeddings, top_N_neighbours)
+    requests_data_dict = parse_requests_dataframe(production_requests_df, hs_cluster, model, top_N_neighbours)
     plottable_result.update(requests_data_dict)
 
     path_to_result_file = s3_model_path + '/result.json'

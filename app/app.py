@@ -95,10 +95,12 @@ def transform(method: str):
     :param modelVersionId: int
     :return: task_id if not found
     """
-    if 'model_version_id' not in set(request.args.keys()):
+    request_json = request.get_json()
+    if 'model_version_id' not in request_json:
         return jsonify(
-            {"message": f"Expected args: 'model_version_id'. Provided args: {set(request.args.keys())}"}), 400
-    model_version_id = int(request.args.get('model_version_id'))
+            {"message": f"Expected 'model_version_id' in body."}), 400
+
+    model_version_id = request_json['model_version_id']
 
     if method not in AVAILABLE_TRANSFORMERS:
         return jsonify(
@@ -118,11 +120,12 @@ def refit_model(method):
     :params model_id: model id int
     :return: job_id
     """
-    if 'model_version_id' not in set(request.args.keys()):
+    request_json = request.get_json()
+    if 'model_version_id' not in request_json:
         return jsonify(
-            {"message": f"Expected args: 'model_version_id'. Provided args: {set(request.args.keys())}"}), 400
+            {"message": f"Expected 'model_version_id' in body."}), 400
 
-    model_version_id = int(request.args.get('model_version_id'))
+    model_version_id = request_json['model_version_id']
     refit_transformer = request.args.get('refit_transformer', True)
 
     if method not in AVAILABLE_TRANSFORMERS:
@@ -188,11 +191,12 @@ def set_params(method):
         request body: see README
     :return: 200
     """
-    if 'model_version_id' not in set(request.args.keys()):
+    request_json = request.get_json()
+    if 'model_version_id' not in request_json:
         return jsonify(
-            {"message": f"Expected args: 'model_version_id'. Provided args: {set(request.args.keys())}"}), 400
+            {"message": f"Expected 'model_version_id' in body."}), 400
 
-    model_version_id = int(request.args.get('model_version_id'))
+    model_version_id = request_json['model_version_id']
     logging.info("Received set params request")
     request_json = request.get_json()
 

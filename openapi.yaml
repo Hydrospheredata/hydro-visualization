@@ -35,12 +35,12 @@ paths:
         schema:
           type: string
         description: Transformer name from ["umap", "trimap","tsne"]. For now only ["umap"].
-      - name: model_version_id
-        in: query
-        required: true
-        schema:
-          type: integer
-        description: ModelVersion id
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequestModelID'
+
       description: transformer - manifold learning transformer from ["umap", "trimap",
         "tsne"]. For now only ["umap"].
       operationId: transform
@@ -75,20 +75,23 @@ paths:
         schema:
           type: string
         description: Transformer name from ["umap", "trimap","tsne"]. For now only ["umap"].
-      - name: model_version_id
-        in: query
-        required: true
-        schema:
-          type: integer
-        description: ModelVersion id
 
-      - name: refit_transformer
-        in: query
-        required: false
-        schema:
-          type: boolean
-          default: true
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                  model_version_id:
+                    type: integer
+                  refit_transformer:
+                    type: boolean
+                    default: true
+              required:
+                - model_version_id
+
       description: Starts job on inferencing new data or refitting transformer model.
+
       responses:
         200:
           description: successful operation
@@ -158,17 +161,20 @@ paths:
         schema:
           type: integer
         description: ModelVersion id
-
       description: Submit new configuration
       operationId: set_params
       requestBody:
-        description: |
-          parameters: dict of transfomer parameters. Different set of parameters for different transformer used.
-          use_labels: true if use ground truth labels from training data. Predicted labels from production data is not used because this will generate false map.
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ProjectorParameters'
+              allOf:
+                - $ref: '#/components/schemas/ProjectorParameters'
+                - type: object
+                  required:
+                    - model_version_id
+                  properties:
+                    model_version_id:
+                      type: integer
         required: true
       responses:
         200:
@@ -285,6 +291,8 @@ components:
           items:
             allOf:
              - $ref: '#/components/schemas/VisualizationMetrics'
+      required:
+        - properties
 
 
     TaskStates:
@@ -402,6 +410,12 @@ components:
             type: array
             items:
               type: integer
+
+    RequestModelID:
+      type: object
+      properties:
+        model_version_id:
+          type: integer
 
 
     TaskResult:

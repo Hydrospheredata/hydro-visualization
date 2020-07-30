@@ -126,7 +126,7 @@ def refit_model(method):
             {"message": f"Expected 'model_version_id' in body."}), 400
 
     model_version_id = request_json['model_version_id']
-    refit_transformer = request.args.get('refit_transformer', True)
+    refit_transformer = request_json.get('refit_transformer', True)
 
     if method not in AVAILABLE_TRANSFORMERS:
         return jsonify(
@@ -198,7 +198,6 @@ def set_params(method):
 
     model_version_id = request_json['model_version_id']
     logging.info("Received set params request")
-    request_json = request.get_json()
 
     if not params_validator.is_valid(request_json):
         error_message = "\n".join([error.message for error in params_validator.iter_errors(request_json)])

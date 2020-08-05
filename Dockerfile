@@ -4,7 +4,8 @@ RUN apt-get update && \
     apt-get install -y -q build-essential git
 
 COPY requirements.txt requirements.txt
-RUN pip3 install --user -r requirements.txt
+RUN pip3 install --upgrade pip  &&\
+    pip3 install --user -r requirements.txt
 
 COPY version version
 COPY .git .git

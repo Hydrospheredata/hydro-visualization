@@ -60,7 +60,9 @@ contract:
       profile: nominal
   outputs:
     embedding:
-      shape: [1, 100]
+      shape:
+        - 1
+        - 100
       type: double
       profile: numerical
     class:

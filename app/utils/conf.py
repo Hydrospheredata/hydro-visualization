@@ -2,6 +2,7 @@ import os
 
 DEBUG_ENV = bool(os.getenv("DEBUG_ENV", True))
 APP_PORT = int(os.getenv("APP_PORT", 5000))
+GRPC_PORT = os.getenv("GRPC_PORT", 5001)
 GRPC_PROXY_ADDRESS = os.getenv("GRPC_PROXY_ADDRESS", "localhost:9090")
 HS_CLUSTER_ADDRESS = os.getenv("HTTP_PROXY_ADDRESS", "http://localhost")
 SECURE = os.getenv("SECURE", False)

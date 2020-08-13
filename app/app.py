@@ -260,7 +260,8 @@ def model_status():
         code = 200
     elif task.state == 'SUCCESS':
         # job completed, return result
-        result, code = task.get()
+        code = 200
+        result = task.get()
         response.update(result)
     else:
         # something went wrong in the background job, return the exception raised

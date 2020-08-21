@@ -7,7 +7,6 @@ COPY requirements.txt requirements.txt
 RUN pip3 install --user -r requirements.txt
 COPY install_hydro_grpc.sh install_hydro_grpc.sh
 RUN sh install_hydro_grpc.sh
-RUN pip list --user
 
 
 COPY version version
@@ -28,8 +27,6 @@ ENV PYTHONUNBUFFERED=1
 
 ENV PATH=/home/app/.local/bin:$PATH
 
-ENV GRPC_PORT=5050
-EXPOSE ${GRPC_PORT}
 ENV APP_PORT=5000
 EXPOSE ${APP_PORT}
 
@@ -38,4 +35,3 @@ COPY --chown=app:app app/ /app
 COPY --from=build --chown=app:app buildinfo.json /app/buildinfo.json
 
 WORKDIR /app
-RUN pip list --user

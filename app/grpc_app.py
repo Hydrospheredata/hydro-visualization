@@ -11,7 +11,6 @@ from grpc_health.v1.health_pb2_grpc import HealthServicer
 from grpc_health.v1.health_pb2_grpc import add_HealthServicer_to_server
 
 from ml_transformers.utils import AVAILABLE_TRANSFORMERS
-from transformation_tasks.tasks import perform_transform_task, TransformResult
 from utils.conf import MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, GRPC_PORT
 from utils.data_management import get_record, get_mongo_client, update_record
 
@@ -22,7 +21,9 @@ db = mongo_client['visualization']
 
 
 class VisServiceServicer(hs_grpc.vis.VisServiceServicer, HealthServicer):
+
     def RefitModel(self, request: hs_grpc.vis.RefitRequest, context):
+        from transformation_tasks.tasks import perform_transform_task, TransformResult
         method = 'umap'
         model_version_id = request.model_version_id
         refit_transformer = request.refit_transformer
@@ -58,8 +59,3 @@ def serve():
     server.start()
     logging.info(f"Server started at [::]:{GRPC_PORT}")
     server.wait_for_termination()
-
-
-if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO)
-    serve()

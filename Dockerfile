@@ -5,8 +5,7 @@ RUN apt-get update && \
 
 COPY requirements.txt requirements.txt
 RUN pip3 install --user -r requirements.txt
-COPY install_hydro_grpc.sh install_hydro_grpc.sh
-RUN sh install_hydro_grpc.sh
+
 
 
 COPY version version

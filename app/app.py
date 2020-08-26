@@ -1,5 +1,6 @@
 import json
 import logging
+import threading
 from logging.config import fileConfig
 from typing import List
 
@@ -12,6 +13,7 @@ from hydrosdk.modelversion import ModelVersion
 from jsonschema import Draft7Validator
 from waitress import serve
 
+from grpc_app import serve
 from ml_transformers.autoembeddings import NOT_IGNORED_PROFILE_TYPES
 from ml_transformers.utils import AVAILABLE_TRANSFORMERS, DEFAULT_PROJECTION_PARAMETERS
 from utils.conf import MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, DEBUG_ENV, \
@@ -271,8 +273,21 @@ def model_status():
     return jsonify(response), code
 
 
-if __name__ == "__main__":
+def run_flask():
+    logging.basicConfig(level=logging.INFO)
     if not DEBUG_ENV:
         serve(app, host='0.0.0.0', port=APP_PORT)
     else:
-        app.run(debug=True, host='0.0.0.0', port=APP_PORT)
+        app.run(debug=True, host='0.0.0.0', port=APP_PORT, use_reloader = False)
+
+
+def run_grpc():
+    logging.basicConfig(level=logging.INFO)
+    serve()
+
+
+if __name__ == "__main__":
+    flask_server = threading.Thread(target=run_flask)
+    grpc_server = threading.Thread(target=run_grpc)
+    flask_server.start()
+    grpc_server.start()

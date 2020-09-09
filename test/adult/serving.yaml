@@ -76,14 +76,9 @@ contract:
       shape: scalar
       type: int64
       profile: categorical
-monitoring:
-  - name: outlier_score
-    config:
-      monitoring-model: adult_scalar_monitoring_test:1
-      operator: <=
-      threshold: 12
+
 ---
 kind: Application
 name: adult_scalar_vis_test
 singular:
-  model: adult_scalar_vis_test:2
+  model: adult_scalar_vis_test:1

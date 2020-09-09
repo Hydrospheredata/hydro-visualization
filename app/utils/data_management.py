@@ -166,7 +166,7 @@ def parse_requests_dataframe(df, hs_cluster: Cluster, model: ModelVersion,
             return Coloring.NONE
 
     monitoring_fields = [(metric.name, metric.config.threshold_op, metric.config.threshold) for metric in
-                         MetricSpec.list_for_model(hs_cluster, model.id)]
+                         MetricSpec.find_by_modelversion(hs_cluster, model.id)]
     scalar_model_outputs: List[ModelField] = list(
         filter(lambda x: len(x.shape.dim) == 0,
                model.contract.predict.outputs))

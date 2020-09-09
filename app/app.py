@@ -1,5 +1,6 @@
 import json
 import logging
+import threading
 from logging.config import fileConfig
 from typing import List
 
@@ -12,6 +13,7 @@ from hydrosdk.modelversion import ModelVersion
 from jsonschema import Draft7Validator
 from waitress import serve
 
+from grpc_app import serve
 from ml_transformers.autoembeddings import NOT_IGNORED_PROFILE_TYPES
 from ml_transformers.utils import AVAILABLE_TRANSFORMERS, DEFAULT_PROJECTION_PARAMETERS
 from utils.conf import MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, DEBUG_ENV, \
@@ -26,7 +28,6 @@ fileConfig("utils/logging_config.ini")
 
 with open("buildinfo.json") as f:
     BUILDINFO = json.load(f)
-
 
 with open('utils/hydro-vis-params-json-schema.json') as f:
     REQUEST_JSON_SCHEMA = json.load(f)
@@ -72,6 +73,7 @@ celery.conf.update({"CELERY_DISABLE_RATE_LIMITS": True})
 
 import transformation_tasks
 
+
 @app.route(PREFIX + "/health", methods=['GET'])
 @disable_logging
 def hello():
@@ -113,36 +115,6 @@ def transform(method: str):
         'task_id': result.task_id}), 202
 
 
-@app.route(PREFIX + '/jobs/<method>', methods=['POST'])
-def refit_model(method):
-    """
-    Starts refitting transformer model
-    :params model_id: model id int
-    :return: job_id
-    """
-    request_json = request.get_json()
-    if 'model_version_id' not in request_json:
-        return jsonify(
-            {"message": f"Expected 'model_version_id' in body."}), 400
-
-    model_version_id = request_json['model_version_id']
-    refit_transformer = request_json.get('refit_transformer', True)
-
-    if method not in AVAILABLE_TRANSFORMERS:
-        return jsonify(
-            {"message": f"Transformer method {method} is  not implemented."}), 400
-
-    db_model_info = get_record(db, method, model_version_id)
-    db_model_info['result_file'] = ''  # forget about old results
-    if refit_transformer:
-        db_model_info['transformer_file'] = ''
-    update_record(db, method, db_model_info, model_version_id)
-    result = transformation_tasks.tasks.transform_task.apply_async(args=(method, model_version_id),
-                                                                   queue="visualization")
-    return jsonify({
-        'task_id': result.task_id}), 202
-
-
 @app.route(PREFIX + '/supported', methods=['GET'])
 def supported():
     if 'model_version_id' not in set(request.args.keys()):
@@ -180,7 +152,6 @@ def supported():
                     "message": f"Model should have at least 2 scalar fields with one of these profiling types: {[profiling.name for profiling in NOT_IGNORED_PROFILE_TYPES]}."}
 
     return {"supported": True}
-
 
 
 @app.route(PREFIX + '/params/<method>', methods=['POST'])
@@ -234,6 +205,36 @@ def get_params(method):
     return jsonify(result), 200
 
 
+@app.route(PREFIX + '/jobs/<method>', methods=['POST'])
+def refit_model(method):
+    """
+    Starts refitting transformer model
+    :params model_id: model id int
+    :return: job_id
+    """
+    request_json = request.get_json()
+    if 'model_version_id' not in request_json:
+        return jsonify(
+            {"message": f"Expected 'model_version_id' in body."}), 400
+
+    model_version_id = request_json['model_version_id']
+    refit_transformer = request_json.get('refit_transformer', True)
+
+    if method not in AVAILABLE_TRANSFORMERS:
+        return jsonify(
+            {"message": f"Transformer method {method} is  not implemented."}), 400
+
+    db_model_info = get_record(db, method, model_version_id)
+    db_model_info['result_file'] = ''  # forget about old results
+    if refit_transformer:
+        db_model_info['transformer_file'] = ''
+    update_record(db, method, db_model_info, model_version_id)
+    result = transformation_tasks.tasks.transform_task.apply_async(args=(method, model_version_id),
+                                                                   queue="visualization")
+    return jsonify({
+        'task_id': result.task_id}), 202
+
+
 @app.route(PREFIX + '/jobs', methods=['GET'])
 def model_status():
     """
@@ -260,7 +261,8 @@ def model_status():
         code = 200
     elif task.state == 'SUCCESS':
         # job completed, return result
-        result, code = task.get()
+        code = 200
+        result = task.get()
         response.update(result)
     else:
         # something went wrong in the background job, return the exception raised
@@ -271,8 +273,21 @@ def model_status():
     return jsonify(response), code
 
 
-if __name__ == "__main__":
+def run_flask():
+    logging.basicConfig(level=logging.INFO)
     if not DEBUG_ENV:
         serve(app, host='0.0.0.0', port=APP_PORT)
     else:
-        app.run(debug=True, host='0.0.0.0', port=APP_PORT)
+        app.run(debug=True, host='0.0.0.0', port=APP_PORT, use_reloader = False)
+
+
+def run_grpc():
+    logging.basicConfig(level=logging.INFO)
+    serve()
+
+
+if __name__ == "__main__":
+    flask_server = threading.Thread(target=run_flask)
+    grpc_server = threading.Thread(target=run_grpc)
+    flask_server.start()
+    grpc_server.start()

@@ -1,5 +1,6 @@
 import logging
 import sys
+from collections import namedtuple
 from datetime import datetime
 from typing import List, Optional, Tuple
 
@@ -22,6 +23,8 @@ from utils.conf import MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH
 from utils.data_management import get_record, parse_embeddings_from_dataframe, parse_requests_dataframe, \
     update_record, get_mongo_client, get_production_subsample, compute_training_embeddings, model_has_embeddings, \
     calcualte_neighbours, get_training_data_path
+
+TransformResult = namedtuple('TransformResult', 'state raise_error meta result')
 
 
 def get_embeddings(production_df: pd.DataFrame, training_df: pd.DataFrame, training_data_sample_size: int,
@@ -99,6 +102,20 @@ def generate_auto_embeddings(production_data: pd.DataFrame, training_data: pd.Da
 
 @celery.task(bind=True, track_started=True)
 def transform_task(self, method, model_version_id):
+    task_result: TransformResult = perform_transform_task(method, model_version_id)
+    if task_result.raise_error:
+        self.update_state(state=task_result.state,
+                          meta=task_result.meta)
+        raise Ignore()
+    if task_result.result is not None:
+        return task_result.result
+    else:
+        self.update_state(state=TaskStates.ERROR,
+                          meta={})
+        raise Ignore()
+
+
+def perform_transform_task(method, model_version_id) -> TransformResult:
     start = datetime.now()
     mongo_client = get_mongo_client(MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB)
     db = mongo_client['visualization']
@@ -115,7 +132,7 @@ def transform_task(self, method, model_version_id):
     if path_to_result_file:
         plottable_result = s3manager.read_json(filepath=path_to_result_file)
         if plottable_result:
-            return {"result": plottable_result}, 200
+            return TransformResult(state='SUCCESS', raise_error=False, meta={}, result={"result": plottable_result})
 
     vis_metrics: List[str] = db_model_info.get('visualization_metrics',
                                                DEFAULT_PROJECTION_PARAMETERS['visualization_metrics'])
@@ -134,13 +151,11 @@ def transform_task(self, method, model_version_id):
         model_version = model.version
         embeddings_exist = model_has_embeddings(model)
     except ValueError as e:
-        self.update_state(state=TaskStates.ERROR,
-                          meta={'message': f"Error: {e}", 'code': 404})
-        raise Ignore()
+        return TransformResult(state=TaskStates.ERROR, raise_error=True, meta={'message': f"Error: {e}", 'code': 404},
+                               result=None)
     except Exception as e:
-        self.update_state(state=TaskStates.ERROR,
-                          meta={'message': f"Error: {e}", 'code': 500})
-        raise Ignore()
+        return TransformResult(state=TaskStates.ERROR, raise_error=True, meta={'message': f"Error: {e}", 'code': 500},
+                               result=None)
 
     if path_to_transformer:
         transformer = s3manager.load_with_joblib(filepath=path_to_transformer)
@@ -166,16 +181,13 @@ def transform_task(self, method, model_version_id):
         training_df = None
     production_requests_df = get_production_subsample(model.id, production_data_sample_size)
     if production_requests_df.empty:
-        self.update_state(state=TaskStates.NO_DATA,
-                          meta={'message': f'{model_name}v{model_version} model has not enough production data.',
-                                'code': 404})
-        raise Ignore()
+        return TransformResult(state=TaskStates.NO_DATA, raise_error=True,
+                               meta={'message': f'{model_name}v{model_version} model has not enough production data.',
+                                     'code': 404}, result=None)
     if ((training_df is None) or training_df.empty) and (not embeddings_exist):
-        self.update_state(state=TaskStates.NO_DATA,
-                          meta={
-                              'message': f'{model_name}v{model_version} model requires training data to generate autoembeddings.',
-                              'code': 404})
-        raise Ignore()
+        return TransformResult(state=TaskStates.NO_DATA, raise_error=True, meta={
+            'message': f'{model_name}v{model_version} model requires training data to generate autoembeddings.',
+            'code': 404}, result=None)
     if embeddings_exist:
         production_embeddings, training_embeddings = get_embeddings(production_requests_df, training_df,
                                                                     training_data_sample_size, hs_cluster, model)
@@ -196,11 +208,9 @@ def transform_task(self, method, model_version_id):
                                                          [training_numerical_embeddings,
                                                           training_categorical_embeddings]
         else:
-            self.update_state(state=TaskStates.NOT_SUPPORTED,
-                              meta={'message': f"Couldn\'t extract autoembeddings from {model}.",
-                                    'code': 404})
-            raise Ignore()
-
+            return TransformResult(state=TaskStates.NOT_SUPPORTED, raise_error=True, meta={
+                'message': f"Couldn\'t extract autoembeddings from {model}.",
+                'code': 404}, result=None)
 
     if isinstance(training_embeddings, np.ndarray):  # not mixed-type data
         top_N_neighbours = calcualte_neighbours(production_embeddings)
@@ -212,7 +222,6 @@ def transform_task(self, method, model_version_id):
         top_N_neighbours = []
         plottable_result, transformer = transform_high_dimensional_mixed(method, parameters,
                                                                          training_embeddings, production_embeddings)
-
 
     requests_data_dict = parse_requests_dataframe(production_requests_df, hs_cluster, model, top_N_neighbours)
     plottable_result.update(requests_data_dict)
@@ -253,4 +262,4 @@ def transform_task(self, method, model_version_id):
 
     logging.info(f'Request handled in {datetime.now() - start}')
 
-    return {"result": plottable_result}, 200
+    return TransformResult(state='SUCCESS', raise_error=False, meta={}, result={"result": plottable_result})

@@ -6,6 +6,8 @@ RUN apt-get update && \
 COPY requirements.txt requirements.txt
 RUN pip3 install --user -r requirements.txt
 
+
+
 COPY version version
 COPY .git .git
 RUN printf '{"name": "visualization", "version":"%s", "gitHeadCommit":"%s","gitCurrentBranch":"%s", "pythonVersion":"%s"}\n' "$(cat version)" "$(git rev-parse HEAD)" "$(git rev-parse --abbrev-ref HEAD)" "$(python --version)" >> buildinfo.json
@@ -24,9 +26,10 @@ ENV PYTHONUNBUFFERED=1
 
 ENV PATH=/home/app/.local/bin:$PATH
 
-ENV GRPC_PORT=5000
+ENV APP_PORT=5000
+EXPOSE ${APP_PORT}
+ENV GRPC_PORT=5003
 EXPOSE ${GRPC_PORT}
-
 COPY --from=build --chown=app:app /root/.local /home/app/.local
 COPY --chown=app:app app/ /app
 COPY --from=build --chown=app:app buildinfo.json /app/buildinfo.json

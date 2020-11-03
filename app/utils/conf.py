@@ -17,6 +17,7 @@ HYDRO_VIS_BUCKET_NAME = os.getenv('BUCKET_NAME', 'hydro-vis')
 AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY', '')
 AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID', '')
 EMBEDDING_FIELD = 'embedding'
+MINIMUM_PROD_DATA_SIZE = 10
 N_NEIGHBOURS = 100
 
 class TaskStates:

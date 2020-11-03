@@ -17,11 +17,11 @@ from grpc_app import serve
 from ml_transformers.autoembeddings import NOT_IGNORED_PROFILE_TYPES
 from ml_transformers.utils import AVAILABLE_TRANSFORMERS, DEFAULT_PROJECTION_PARAMETERS
 from utils.conf import MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, DEBUG_ENV, \
-    APP_PORT, HS_CLUSTER_ADDRESS, GRPC_PROXY_ADDRESS
+    APP_PORT, HS_CLUSTER_ADDRESS, GRPC_PROXY_ADDRESS, EMBEDDING_FIELD
 from utils.data_management import S3Manager, update_record, \
-    get_mongo_client
+    get_mongo_client, model_has_production_data
 from utils.data_management import get_record
-from utils.data_management import model_has_embeddings, get_production_subsample, get_training_data_path
+from utils.data_management import model_has_correct_embeddings_field, get_training_data_path
 from utils.logs import disable_logging
 
 fileConfig("utils/logging_config.ini")
@@ -126,23 +126,22 @@ def supported():
         hs_cluster = Cluster(HS_CLUSTER_ADDRESS, grpc_address=GRPC_PROXY_ADDRESS)
         model = ModelVersion.find_by_id(hs_cluster, int(model_version_id))
     except ValueError as e:
-        logging.error(f'Couldn\'t find model {model.name}v{model.version}. Error: {e}')
+        logging.error(f'Couldn\'t find model version {model_version_id}. Error: {e}')
         return {"supported": False, "message": f"Unable to find {model_version_id}"}, 200
     except Exception as e:
-        logging.error(f'Couldn\'t check model {model.name}v{model.version}. Error: {e}')
+        logging.error(f'Couldn\'t check model version {model_version_id}. Error: {e}')
         return {"supported": False, "message": f"Could not check if model {model_version_id} is valid. Error: {e}"}, 200
     try:
-        prod_subsample = get_production_subsample(model_version_id, size=10)
-        if prod_subsample.empty:
+        if not model_has_production_data(model.id):
             return {"supported": False, "message": "No production data."}
     except Exception as e:
         logging.error(f'Couldn\'t get production subsample. Error: {e}')
         return {"supported": False, "message": "Couldn't check production data."}
     training_data_path = get_training_data_path(model)
-    embeddings_exist = model_has_embeddings(model)
+    embeddings_exist = model_has_correct_embeddings_field(model)
     if not training_data_path and not embeddings_exist:
         return {"supported": False,
-                "message": "Upload training data to use projector for models without 'embedding' field."}
+                "message": f"Upload training data to use projector for models without correct {EMBEDDING_FIELD} field. {EMBEDDING_FIELD} field should return vector of shape: [1, some_embedding_dim]."}
     if not embeddings_exist:
         scalar_inputs_with_profile = list(
             filter(lambda x: (ProfilingType(x.profile) in NOT_IGNORED_PROFILE_TYPES) and (len(x.shape.dim) == 0),
@@ -278,7 +277,7 @@ def run_flask():
     if not DEBUG_ENV:
         serve(app, host='0.0.0.0', port=APP_PORT)
     else:
-        app.run(debug=True, host='0.0.0.0', port=APP_PORT, use_reloader = False)
+        app.run(debug=True, host='0.0.0.0', port=APP_PORT, use_reloader=False)
 
 
 def run_grpc():

@@ -275,17 +275,28 @@ def get_production_subsample(model_id, size=1000) -> pd.DataFrame:
     return pd.DataFrame.from_dict(r.json())
 
 
-def model_has_embeddings(model: ModelVersion) -> [bool]:
+def model_has_production_data(model_id) -> bool:
+    production_data_aggregates = requests.get(f"{HS_CLUSTER_ADDRESS}/monitoring/checks/aggregates/{model_id}",
+                                              params={"limit": 1, "offset": 0}).json()
+    number_of_production_requests = production_data_aggregates['count']
+    return number_of_production_requests > 0
+
+
+def model_has_correct_embeddings_field(model: ModelVersion) -> bool:
     """
-    TODO add embedding field shape check
-    Check if model returns embeddings
+    Check if model returns EMBEDDING_FIELD with shape of vector [1, N]
     :param model:
-    :return:
+    :return: True if returns EMBEDDING_FIELD with shape of vector [1, N]
     """
-    output_names = [field.name for field in model.contract.predict.outputs]
+    output_names = {field.name:field for field in model.contract.predict.outputs}
     if EMBEDDING_FIELD not in output_names:
+        logging.info(f'Model {model.name}v{model.version} has no {EMBEDDING_FIELD} in it\'s contract')
         return False
-    return True
+    embedding_field_shape = output_names[EMBEDDING_FIELD].shape.dim
+    shape_is_correct = len(embedding_field_shape) == 2 and embedding_field_shape[0].size == 1
+    logging.info(f'Model {model.name}v{model.version} {EMBEDDING_FIELD} field shape is '
+                 f'{"OK." if shape_is_correct else f"not OK. Expected: [1, some_embedding_shape], Got:{embedding_field_shape}. "}')
+    return shape_is_correct
 
 
 def get_training_data_path(model: ModelVersion) -> str:

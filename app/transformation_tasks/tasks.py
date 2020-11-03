@@ -19,9 +19,10 @@ from ml_transformers.transformer import transform_high_dimensional, transform_hi
     UmapTransformerWithMixedTypes
 from ml_transformers.utils import VisMetrics, DEFAULT_PROJECTION_PARAMETERS
 from utils.conf import MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, HYDRO_VIS_BUCKET_NAME, \
-    HS_CLUSTER_ADDRESS, GRPC_PROXY_ADDRESS, TaskStates
+    HS_CLUSTER_ADDRESS, GRPC_PROXY_ADDRESS, TaskStates, EMBEDDING_FIELD
 from utils.data_management import get_record, parse_embeddings_from_dataframe, parse_requests_dataframe, \
-    update_record, get_mongo_client, get_production_subsample, compute_training_embeddings, model_has_embeddings, \
+    update_record, get_mongo_client, get_production_subsample, compute_training_embeddings, \
+    model_has_correct_embeddings_field, \
     calcualte_neighbours, get_training_data_path
 
 TransformResult = namedtuple('TransformResult', 'state raise_error meta result')
@@ -149,7 +150,9 @@ def perform_transform_task(method, model_version_id) -> TransformResult:
         model = ModelVersion.find_by_id(hs_cluster, int(model_version_id))
         model_name = model.name
         model_version = model.version
-        embeddings_exist = model_has_embeddings(model)
+        embeddings_exist = model_has_correct_embeddings_field(model)
+        logging.info(
+            f'Model {model_name}:{model_version} {"has" if embeddings_exist else "does not have"} {EMBEDDING_FIELD} field in output contract')
     except ValueError as e:
         return TransformResult(state=TaskStates.ERROR, raise_error=True, meta={'message': f"Error: {e}", 'code': 404},
                                result=None)

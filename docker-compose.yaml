@@ -13,10 +13,13 @@ services:
       - AWS_ACCESS_KEY_ID=minio
       - AWS_SECRET_ACCESS_KEY=minio123
       - AWS_STORAGE_ENDPOINT=http://minio:9000
+      - AWS_BUCKET=hydrosphere-visualization-artifacts
+      - AWS_REGION=
     command: celery -A app.celery worker -Q visualization
     depends_on:
       - hydrovis
       - mongodb
+      - minio
 
   hydrovis:
     build: .
@@ -28,16 +31,26 @@ services:
       - AWS_ACCESS_KEY_ID=minio
       - AWS_SECRET_ACCESS_KEY=minio123
       - AWS_STORAGE_ENDPOINT=http://minio:9000
-
+      - AWS_BUCKET=hydrosphere-visualization-artifacts
+      - AWS_REGION=
     command: python app.py
     ports:
       - "5000:5000"
     depends_on:
       - mongodb
+      - minio
 
   mongodb:
     image: mongo:3.0.2
     container_name: mongodb
     ports:
       - "27017:27017"
-
+    
+  minio:
+    image: minio/minio:RELEASE.2020-06-14T18-32-17Z
+    ports: 
+      - 9000:9000
+    command: server /data 
+    environment:
+      MINIO_ACCESS_KEY: minio
+      MINIO_SECRET_KEY: minio123

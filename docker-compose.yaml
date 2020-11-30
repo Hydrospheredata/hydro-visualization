@@ -31,6 +31,7 @@ services:
       - AWS_SECRET_ACCESS_KEY=minio123
       - AWS_STORAGE_ENDPOINT=http://minio:9000
       - AWS_BUCKET=hydrosphere-visualization-artifacts
+      - AWS_REGION=
     command: python app.py
     ports:
       - "5000:5000"
@@ -52,4 +53,3 @@ services:
     environment:
       MINIO_ACCESS_KEY: minio
       MINIO_SECRET_KEY: minio123
-

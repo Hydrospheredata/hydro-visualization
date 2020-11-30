@@ -17,7 +17,7 @@ from grpc_app import serve
 from ml_transformers.autoembeddings import NOT_IGNORED_PROFILE_TYPES
 from ml_transformers.utils import AVAILABLE_TRANSFORMERS, DEFAULT_PROJECTION_PARAMETERS
 from utils.conf import MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, DEBUG_ENV, \
-    APP_PORT, HS_CLUSTER_ADDRESS, GRPC_PROXY_ADDRESS, EMBEDDING_FIELD
+    APP_PORT, HS_CLUSTER_ADDRESS, GRPC_PROXY_ADDRESS, EMBEDDING_FIELD, GRPC_PORT
 from utils.data_management import S3Manager, update_record, \
     get_mongo_client, model_has_production_data
 from utils.data_management import get_record
@@ -273,19 +273,25 @@ def model_status():
 
 
 def run_flask():
-    logging.basicConfig(level=logging.INFO)
+    logging.info(f"Starting http server on port ${APP_PORT}")
     if not DEBUG_ENV:
-        serve(app, host='0.0.0.0', port=APP_PORT)
+        from gevent.pywsgi import WSGIServer
+        http_server = WSGIServer(('', APP_PORT), app)
+        http_server.serve_forever()
     else:
         app.run(debug=True, host='0.0.0.0', port=APP_PORT, use_reloader=False)
 
 
 def run_grpc():
-    logging.basicConfig(level=logging.INFO)
+    logging.info(f"Starting grpc server on port ${GRPC_PORT}")
     serve()
 
 
 if __name__ == "__main__":
+    if DEBUG_ENV:
+        logging.basicConfig(level=logging.DEBUG)
+    else: 
+        logging.basicConfig(level=logging.INFO)
     flask_server = threading.Thread(target=run_flask)
     grpc_server = threading.Thread(target=run_grpc)
     flask_server.start()

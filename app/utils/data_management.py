@@ -11,6 +11,7 @@ import numpy as np
 import pandas as pd
 import requests
 import s3fs
+from botocore.client import Config
 from hydrosdk.cluster import Cluster
 from hydrosdk.contract import ModelField, ProfilingType
 from hydrosdk.modelversion import ModelVersion
@@ -20,8 +21,8 @@ from pymongo import MongoClient
 
 from ml_transformers.utils import DEFAULT_TRANSFORMER_PARAMETERS, Coloring, get_top_N_neighbours, \
     DEFAULT_PROJECTION_PARAMETERS
-from utils.conf import AWS_STORAGE_ENDPOINT, HS_CLUSTER_ADDRESS, HYDRO_VIS_BUCKET_NAME, EMBEDDING_FIELD, \
-    N_NEIGHBOURS
+from utils.conf import AWS_STORAGE_ENDPOINT, AWS_REGION, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, \
+    HS_CLUSTER_ADDRESS, HYDRO_VIS_BUCKET_NAME, EMBEDDING_FIELD, N_NEIGHBOURS
 
 
 def get_mongo_client(mongo_url, mongo_port, mongo_user, mongo_pass, mongo_auth_db):
@@ -34,33 +35,30 @@ class S3Manager:
     def __init__(self):
 
         if AWS_STORAGE_ENDPOINT:
-
+            client_kwargs = {
+                'endpoint_url': AWS_STORAGE_ENDPOINT,
+                'region_name': AWS_REGION,
+            }
             self.fs = s3fs.S3FileSystem(
                 anon=False,
-                client_kwargs={
-                    'endpoint_url': AWS_STORAGE_ENDPOINT
-                },
+                client_kwargs=client_kwargs,
                 config_kwargs={'s3': {'addressing_style': 'path'}}
             )
 
-            from botocore.client import Config
             conf = Config(s3={'addressing_style': 'path'})
-
-            boto_client = boto3.client(
-                's3',
-                endpoint_url=AWS_STORAGE_ENDPOINT,
-                config=conf
-            )
-
+            boto_client = boto3.client('s3', config=conf, **client_kwargs)
         else:
             self.fs = s3fs.S3FileSystem()
-            boto_client = boto3.client(
-                's3')
-        sleep(random.random())
+            boto_client = boto3.client('s3')
         if not self.fs.exists(f's3://{HYDRO_VIS_BUCKET_NAME}'):
             logging.info(f'Creating {HYDRO_VIS_BUCKET_NAME} bucket')
             try:
-                boto_client.create_bucket(Bucket=HYDRO_VIS_BUCKET_NAME)
+                boto_client.create_bucket(
+                    Bucket=HYDRO_VIS_BUCKET_NAME,
+                    CreateBucketConfiguration={
+                        'LocationConstraint': AWS_REGION
+                    }
+                )
             except Exception as e:
                 if not self.fs.exists(f's3://{HYDRO_VIS_BUCKET_NAME}'):
                     logging.error(f'Couldn\'t create {HYDRO_VIS_BUCKET_NAME} bucket due to error: {e}')

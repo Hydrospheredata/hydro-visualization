@@ -164,7 +164,7 @@ def updateHelmChart(String newVersion){
   dir('helm'){
     //Change template
     sh script: "sed -i \"s/.*full:.*/  full: hydrosphere\\/${SERVICENAME}:$newVersion/g\" visualization/values.yaml", label: "sed ${SERVICENAME} version"
-    sh script: "sed -i \"s/.*visualization.*/    full: hydrosphere\\/visualization:$newVersion/g\" dev.yaml", label: "sed ${SERVICENAME} dev stage version"
+    sh script: "sed -i \"s/.*visualization.*/    full: hydrosphere\\/${SERVICENAME}:$newVersion/g\" dev.yaml", label: "sed ${SERVICENAME} dev stage version"
 
     //Refresh readme for chart
     sh script: "frigate gen visualization --no-credits > visualization/README.md"

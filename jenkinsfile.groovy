@@ -205,7 +205,6 @@ node('hydrocentral') {
           sdkVersion = sh(script: "curl -Ls https://pypi.org/pypi/hydrosdk/json | jq -r .info.version", returnStdout: true, label: "get sdk version").trim()
         }
       }
-    }
 
     stage('Test'){
       if (env.CHANGE_ID != null){
@@ -243,16 +242,16 @@ node('hydrocentral') {
                 }
             }
         }
-    //post if success
-    if (params.release == 'local'){
-        slackMessage()
-    }
+      //post if success
+      if (params.release == 'local'){
+          slackMessage()
+      }
     } catch (e) {
     //post if failure
-        currentBuild.result = 'FAILURE'
-    if (params.release == 'local'){
-        slackMessage()
-    }
+      currentBuild.result = 'FAILURE'
+      if (params.release == 'local'){
+          slackMessage()
+      }
         throw e
     }
 }

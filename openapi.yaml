@@ -14,18 +14,19 @@ externalDocs:
   url: http://swagger.io
 servers:
 - url: https://localhost/
-- url: http://localhost/
+- url: http://localhost:5000/
 tags:
-- name: Embeddings
-  description: embeddings
-  externalDocs:
-    description: Find out more
-    url: http://google.com
+- name: Projection
+  description: projection requests
+- name: Jobs
+  description: request jobs for background refitting and inference
+- name: Params
+  description: set/get projector parameters
 paths:
-  /plottable_embeddings/{method}:
+  /visualization/plottable_embeddings/{method}:
     post:
       tags:
-      - Embeddings
+      - Projection
       summary: creates task to transform data
       parameters:
       - name: method
@@ -34,15 +35,15 @@ paths:
         schema:
           type: string
         description: Transformer name from ["umap", "trimap","tsne"]. For now only ["umap"].
-      description: Request for transformed embeddings of a model to plot. Service creates task and starts working on it. It is not fast (unless you have previously transformed requests for your model and not many new requests appeared since that).
-      operationId: transform
       requestBody:
-        description: Embedding parameters
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/EmbeddingRequest'
-        required: true
+              $ref: '#/components/schemas/RequestModelID'
+
+      description: transformer - manifold learning transformer from ["umap", "trimap",
+        "tsne"]. For now only ["umap"].
+      operationId: transform
       responses:
         200:
           description: successful operation
@@ -62,7 +63,7 @@ paths:
         500:
           description: Couldn't create model/servable
           content: {}
-  /jobs:
+  /visualization/jobs/{method}:
     post:
       tags:
       - Jobs
@@ -75,18 +76,25 @@ paths:
           type: string
         description: Transformer name from ["umap", "trimap","tsne"]. For now only ["umap"].
 
-      - name: refit_transformer
-        in: query
-        required: false
-        schema:
-          type: boolean
-          default: true
-        description: If True, then transformer is refitted on new data. Otherwise, new data is inferenced using old data manifold. Default False
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                  model_version_id:
+                    type: integer
+                  refit_transformer:
+                    type: boolean
+                    default: true
+              required:
+                - model_version_id
 
-      description: Silently invokes refitting of transformer on new produciton subsample of a given model.
+      description: Starts job on inferencing new data or refitting transformer model.
+
       responses:
         200:
-          description: Service creates task and starts working on it.
+          description: successful operation
           content:
             application/json:
               schema:
@@ -101,15 +109,20 @@ paths:
       - Jobs
       summary: Get result of fitting transformer from requests jobs/{method} and plottable_embeddings/{method}
       parameters:
+      - name: method
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Transformer name from ["umap", "trimap","tsne"]. For now only ["umap"].
       - name: task_id
         in: query
         required: true
         schema:
           type: string
-        description: id of a task returned by POST /visualization/jobs/ or POST /visualization/plottable_embeddings/
       responses:
         200:
-          description: successfully started or finished task
+          description: successfully started task
           content:
             application/json:
               schema:
@@ -130,10 +143,10 @@ paths:
 
 
 
-  /params/{method}:
+  /visualization/params/{method}:
     post:
       tags:
-      - params
+      - Params
       summary: Submit new configuration
       parameters:
       - name: method
@@ -142,36 +155,145 @@ paths:
         schema:
           type: string
         description: Transformer name from ["umap", "trimap","tsne"]. For now only ["umap"].
+      - name: model_version_id
+        in: query
+        required: true
+        schema:
+          type: integer
+        description: ModelVersion id
       description: Submit new configuration
       operationId: set_params
       requestBody:
-        description: |
-          parameters: dict of transfomer parameters. Different set of parameters for different transformer used.
-          use_labels: true if use ground truth labels from training data. Predicted labels from production data is not used because this will generate false map.
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ModelParameters'
+              allOf:
+                - $ref: '#/components/schemas/ProjectorParameters'
+                - type: object
+                  required:
+                    - model_version_id
+                  properties:
+                    model_version_id:
+                      type: integer
         required: true
       responses:
         200:
           description: success
           content: {}
+    get:
+      tags:
+      - Params
+      summary:  Get current parameters of Projector
+      parameters:
+      - name: method
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Transformer name from ["umap", "trimap","tsne"]. For now only ["umap"].
+      - name: model_version_id
+        in: query
+        required: true
+        schema:
+          type: integer
+        description: ModelVersion id
+      operationId: get_params
+      responses:
+        200:
+          description: success
+          content:
+           application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectorParameters'
+
+
+  /visualization/supported:
+    get:
+      tags:
+      - Helper
+      parameters:
+      - name: model_version_id
+        in: query
+        required: true
+        schema:
+          type: integer
+        description: ModelVersion id
+      responses:
+        200:
+          description: Analyzed model
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  supported:
+                    type: boolean
+                  message:
+                    description: Explanation why not supported, if supported, then empty
+                    type: string
+
+
 
 components:
   schemas:
-    ModelParameters:
+    TransformerProperties:
       type: object
       properties:
-        model_name:
+        metric:
           type: string
-        model_version:
+          allOf:
+            - $ref: '#/components/schemas/TransformerPropertiresMetrics'
+        min_dist:
           type: number
-        parameters:
+        n_components:
+          type: integer
+        n_neighbours:
+          type: integer
+
+    TransformerPropertiresMetrics:
+      type: string
+      enum:
+      - euclidean
+      - manhattan
+      - chebyshev
+      - minkowski
+      - canberra
+      - braycurtis
+      - haversine
+      - mahalanobis
+      - wminkowski
+      - seuclidean
+      - cosine
+      - correlation
+      - hamming
+      - jaccard
+      - dice
+      - russellrao
+      - kulsinski
+      - rogerstanimoto
+      - sokalmichener
+      - sokalsneath
+      - yule
+
+    ProjectorParameters:
+      type: object
+      properties:
+        properties:
           type: object
-          properties: {}
-        use_labels:
-          type: boolean
+          allOf:
+            - $ref: '#/components/schemas/TransformerProperties'
+        production_data_sample_size:
+          type: integer
+        training_data_sample_size:
+          type: integer
+        visualization_metrics:
+          type: array
+          items:
+            allOf:
+             - $ref: '#/components/schemas/VisualizationMetrics'
+      required:
+        - properties
+
 
     TaskStates:
       type: string
@@ -192,21 +314,33 @@ components:
       - stability_score
       - msid
       - clustering
-      description: Metrics that are used to evaluate how good will visualization reflect your real multidimensional data in 2D/3D plot. More on visualization metrics you can find in documentation
-    EmbeddingRequest:
+
+
+    OneOutputInfo:
       type: object
       properties:
-        model_name:
+        coloring_type:
           type: string
-          description: name of a model that has `embedding` field in output
-        model_version:
-          type: integer
-          format: int64
-          description: version of a model
-        visualization_metrics:
+        data:
           type: array
           items:
-            $ref: '#/components/schemas/VisualizationMetrics'
+            anyOf:
+              - type: number
+              - type: string
+              - type: integer
+        dtype:
+          type: integer
+        classes:
+          anyOf:
+              - type: number
+              - type: string
+              - type: integer
+      required:
+        - coloring_type
+        - data
+        - dtype
+
+
     TaskResponse:
       type: object
       properties:
@@ -214,8 +348,16 @@ components:
           type: string
       required:
         - task_id
-    EmbeddingResult:
+    PlottableResult:
       type: object
+      required:
+        - data_shape
+        - data
+        - request_ids
+        - class_labels
+        - visualization_metrics
+        - top_N
+        - counterfactuals
       properties:
         data_shape:
           type: array
@@ -225,49 +367,24 @@ components:
           type: array
           items:
             type: object
+        training_data_shape:
+          type: array
+          items:
+            type: integer
+        training_data:
+          type: array
+          items:
+            type: object
         request_ids:
           type: array
           items:
             type: integer
-        class_labels:
+        output_info:
           type: object
-          properties:
-            confidences:
-              type: object
-              properties:
-                classes:
-                  type: array
-                  items:
-                    type: number
-                coloring_type:
-                  type: string
-                data:
-                  type: array
-                  items:
-                    type: number
-              required:
-                - coloring_type
-                - data
-            class:
-              type: object
-              properties:
-                classes:
-                  type: array
-                  items:
-                    type: number
-                coloring_type:
-                  type: string
-                data:
-                  type: array
-                  items:
-                    type: number
-              required:
-                - coloring_type
-                - data
-        parameters:
-          type: object
-          properties: {}
-        metrics:
+          description: key is output name, value is it's info - values, coloring and dtype
+          additionalProperties:
+             $ref: '#/components/schemas/OneOutputInfo'
+        visualization_metrics:
           type: object
           properties:
             anomality:
@@ -281,36 +398,32 @@ components:
                   type: number
                 operation:
                   type: string
-        top_100:
+        top_N:
           type: array
           items:
-            type: object
+            type: array
+            items:
+              type: integer
         counterfactuals:
           type: array
           items:
-            type: object
-        visualization_metrics:
-          type: object
-          properties:
-            global_score:
-              type: number
-            sammon_error:
-              type: number
-            auc_score:
-              type: number
-            stability_score:
-              type: number
-            msid:
-              type: number
-            clustering:
-              type: number
+            type: array
+            items:
+              type: integer
+
+    RequestModelID:
+      type: object
+      properties:
+        model_version_id:
+          type: integer
+
 
     TaskResult:
       type: object
       properties:
         result:
           type: object
-          $ref: '#/components/schemas/EmbeddingResult'
+          $ref: '#/components/schemas/PlottableResult'
         state:
           type: string
           $ref: '#/components/schemas/TaskStates'
@@ -321,4 +434,3 @@ components:
       required:
       - state
       - task_id
-

@@ -1,63 +1,63 @@
 kind: Model
 name: "adult_scalar_test"
 payload:
-  - "model/src/"
-  - "model/requirements.txt"
-  - "model/classification_model.joblib"
+  - "src/"
+  - "requirements.txt"
+  - "classification_model.joblib"
 runtime: "hydrosphere/serving-runtime-python-3.6:0.1.2-rc0"
 install-command: "pip install -r requirements.txt"
-training-data: ../data/profile.csv
+training-data: ../data/train.csv
 contract:
   name: "predict"
   inputs:
     age:
       shape: scalar
       type: int64
-      profile: numerical
+      profile: ratio
     workclass:
       shape: scalar
       type: int64
-      profile: numerical
+      profile: nominal
     education:
       shape: scalar
       type: int64
-      profile: numerical
+      profile: ordinal
     marital_status:
       shape: scalar
       type: int64
-      profile: numerical
+      profile: nominal
     occupation:
       shape: scalar
       type: int64
-      profile: numerical
+      profile: nominal
     relationship:
       shape: scalar
       type: int64
-      profile: numerical
+      profile: nominal
     race:
       shape: scalar
       type: int64
-      profile: numerical
+      profile: nominal
     sex:
       shape: scalar
       type: int64
-      profile: numerical
+      profile: nominal
     capital_gain:
       shape: scalar
       type: int64
-      profile: numerical
+      profile: ratio
     capital_loss:
       shape: scalar
       type: int64
-      profile: numerical
+      profile: ratio
     hours_per_week:
       shape: scalar
       type: int64
-      profile: numerical
+      profile: ratio
     country:
       shape: scalar
       type: int64
-      profile: numerical
+      profile: nominal
   outputs:
     embedding:
       shape: [1, 100]
@@ -71,10 +71,3 @@ contract:
       shape: scalar
       type: int64
       profile: numerical
-monitoring:
-  - name: outlier_score
-    config:
-      monitoring-model: adult_scalar_monitoring_test:5
-      operator: <=
-      threshold: 12
-

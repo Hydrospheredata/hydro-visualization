@@ -9,12 +9,12 @@ Contents:
 [Manifold Learning Transformers](#manifold-learning-transformers)
 
 # DEPENDENCIES
-
 ```python
-DEBUG_ENV = bool(os.getenv("DEBUG_ENV", True))
+DEBUG_ENV = bool(os.getenv("DEBUG_ENV", False))
 APP_PORT = int(os.getenv("APP_PORT", 5000))
-SERVING_URL = os.getenv("SERVING_URL", "managerui:9090")
-CLUSTER_URL = os.getenv("CLUSTER_URL", "http://localhost")
+GRPC_PORT = os.getenv("GRPC_PORT", 5001)
+GRPC_PROXY_ADDRESS = os.getenv("GRPC_PROXY_ADDRESS", "localhost:9090")
+HS_CLUSTER_ADDRESS = os.getenv("HTTP_PROXY_ADDRESS", "http://localhost")
 SECURE = os.getenv("SECURE", False)
 MONGO_URL = os.getenv("MONGO_URL", "mongodb")
 MONGO_PORT = int(os.getenv("MONGO_PORT", 27017))
@@ -22,39 +22,52 @@ MONGO_AUTH_DB = os.getenv("MONGO_AUTH_DB", "admin")
 MONGO_USER = os.getenv("MONGO_USER")
 MONGO_PASS = os.getenv("MONGO_PASS")
 AWS_STORAGE_ENDPOINT = os.getenv('AWS_STORAGE_ENDPOINT', '')
-FEATURE_LAKE_BUCKET = os.getenv('FEATURE_LAKE_BUCKET', 'feature-lake')
-HYDRO_VIS_BUCKET_NAME = os.getenv('BUCKET_NAME', 'hydro-vis')
+AWS_REGION = os.getenv('AWS_REGION', '')
+HYDRO_VIS_BUCKET_NAME = os.getenv('AWS_BUCKET', 'visualization-artifacts')
+AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY', '')
+AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID', '')
+EMBEDDING_FIELD = 'embedding'
+MINIMUM_PROD_DATA_SIZE = 10
+N_NEIGHBOURS = 100
 ```
+
 
 
 # Transformation pipeline
 Transformation consists of three main stages: 
 
-1. Collecting model embeddings from training and production data
+1. Collecting model embeddings from training and production data or generating them automatically
 2. Transforming collected embeddings from N dimension to 2 dimensions
 3. Caching results
+
+## Supported logic:
+![supported](img/supported.png)
 
 ## Collecting model embeddings
 
 Model has two resources of data: training data (it is uploaded to S3 storage during model upload) and production data - all requests that go through model. 
-[Transformation task](../transformation_tasks/tasks.py) starts with collecting this data. 
+[Transformation task](../app/transformation_tasks/tasks.py) starts with collecting this data. 
 
-### Training data
+### Get Embeddings
+If model has it's own embeddings in return field `embedding` we retrieve that info
+
+**Method: [get_embeddings](../app/transformation_tasks/tasks.py)**
+
+#### Training data
 First, service requests path to training data:
 
 ```
 GET {CLUSTER_URL}/monitoring/training_data?modelVersionId={model.id}
 ```
-**Method: [get_training_data_path](../transformation_tasks/tasks.py)**
+
 
 However, training data usually contains only model inputs and labels, it does not have any model embeddings. To produce such embeddings we create a shadowless servable of a model and send training data as separate requests.
 We do this in order to not litter unwanted requests in model monitoring. 
-**Method: [compute_training_embeddings](../data_management.py)**
 
 > If model has no training data, we ignore this step and set `training_embeddings` to `None`. This data is not required, but it is recommended to have it for more accurate transformation. 
 
-### Production data
-For visualization we do not use all produciton data, instead we request a subsample of data of size 1000. 
+#### Production data
+For visualization we do not use all produciton data, instead we request a subsample of data of size which is configurable 
 
 ``
 GET {CLUSTER_URL}/monitoring/checks/subsample/{model_id}?size={size}
@@ -66,89 +79,110 @@ Production sample is a dataframe that contains not only embeddings but also all 
 
 Secondly, we extract additional information about requests:
 
-- class labels (if model has `class` in outputs)
-- confidence scores (if model has `confidence` output)
+- discrete labels/classes (1D model output with certain profile [categorical, ordinal and nominal])
+- continuous labels/confidence (1D model output with certain profile [numerical, continuous, ratio and interval])
 - monitoring metrics return values, thresholds and comparison operator
 - N nearest neighbours (for each request) in original embedding space
 - N Closest counterfactuals (nearest requests with different labels)
 
-**Method: [parse_requests_dataframe](../data_management.py)**
+More in: 
+
+**Method: [parse_requests_dataframe](../app/utils/data_management.py)**
 
 All this additional labeling data is used to color visualization. In UI you can choose how to assign colors to data points:
 For continuous values (ex. confidence score) `gradient` coloring is used.
 
 > In visualization even though monitoring metrics return continuous scores, each score is thresholded using metric threshold and comparison operator. Thus requests will be colored in only two colors.
 
+### Generate Embeddings
+
+To generate embeddings we use 1D model inputs with profile info to train various scalers and encoders. 
+For each input field we infer transformation type from certain profile->transformation mapping.
+
+**Code: [autoembeddings](../app/ml_transformers/autoembeddings.py)**
+
+```python
+class TransformationType(Enum):
+    ONE_HOT = 0
+    ORDINAL = 1
+    ROBUST = 2
+    NO_TRANSFORMATION = 3
+    IGNORE = 4
+```
+Mapping:
+
+```python
+PROFILE_TYPE_TO_TRANSFORMATION = {ProfilingType.NONE: TransformationType.IGNORE,
+                                  ProfilingType.CATEGORICAL: TransformationType.ONE_HOT,
+                                  ProfilingType.NOMINAL: TransformationType.ONE_HOT,
+                                  ProfilingType.ORDINAL: TransformationType.ORDINAL,
+                                  ProfilingType.NUMERICAL: TransformationType.ROBUST,
+                                  ProfilingType.CONTINUOUS: TransformationType.ROBUST,
+                                  ProfilingType.INTERVAL: TransformationType.NO_TRANSFORMATION,
+                                  ProfilingType.RATIO: TransformationType.NO_TRANSFORMATION,
+                                  ProfilingType.IMAGE: TransformationType.IGNORE,
+                                  ProfilingType.VIDEO: TransformationType.IGNORE,
+                                  ProfilingType.AUDIO: TransformationType.IGNORE,
+                                  ProfilingType.TEXT: TransformationType.IGNORE}
+
+```
+
+For each suitable input encoder is generated using training data to train encoder. 
+
 ## Transforming embeddings
 Both training and production embeddings are passed to instance of manifold-learning transformer ([transformer](../ml_transformers/transformer.py)).
 If transformer instance is cached, then we use method transformer.transform, which does not invoke training of transformer.
 If we do not have pretrained saved transformer instance, we use transformer.fit_transform, which trains transformer with all available data.
 
-**Method: [transform_high_dimensional](../visualizer.py)**
+**Method: [perform_transform_task](../app/transformation_tasks/tasks.py)**
  
 After transforming, embeddings are evaluated using specific metric that can estimate how good we fitted N-dimensional embeddings in 2-dimensional space.
 
-## Caching results
-```json
-{
-"model_name": "adult_scalar",
-"model_version": "1",
-"result_file": "s3://hydro-vis/adult_scalar/2/result.json",
-"transformer_file": "s3://hydro-vis/adult_scalar/2/umap_transformer",
-"parameters": {"n_neighbours": 15,
-                  "min_dist": 0.1,
-                  "metric":  "cosine"},
-"use_labels": false
-}
+## Caching results in Mongo
+```python
+{"model_version_id": model_version_id,
+                "result_file": "", # path to file on S3
+                "transformer_file": "", # path to file on S3
+                "encoder_file": "", # path to autoembeddings encoder joblib file on S3 (if autoembeddings are used)
+                "parameters": DEFAULT_TRANSFORMER_PARAMETERS[method],
+                "visualization_metrics": DEFAULT_PROJECTION_PARAMETERS['visualization_metrics'],
+                "production_data_sample_size": DEFAULT_PROJECTION_PARAMETERS['production_data_sample_size'],
+                "training_data_sample_size": DEFAULT_PROJECTION_PARAMETERS['training_data_sample_size']}
 ```
 
 Inferencing embeddings and training transformer is time-consuming. For that we store latest results of transformation and pretrained transformer on S3 bucket `hydro-vis`. 
 Path to these files are stored in mongodb. 
 
-To visualize new requests post a job request:
+## Refitting data
 
-**POST** /visualization/jobs/<method> 
+After certain amount of requests we need to refresh our data, so we need to refit new requests or sometime we need to retrain transformer on new data.
+To do this task there is GRPC service that allows to refit transformer on new subsample with saved configuration and save result on S3. Next time on UI user will see new data.
 
-**Data Params**
+**Code: [grpc_app](../app/grpc_app.py)**
 
-    ```json
-    {        "model_name": "adult_scalar",
-             "model_version": 1
-    }
-    ```
+## Changing config parameters
 
+Sometimes we need to change some transfomer parameters or projection parameters. 
+Parameters:
 
-If a lot of new data came through model we need to refit transformer before inferencing new data. Because inferencing a lot of new data on old transformer will result in inaccurate visualization.
-For this add refit_transformer parameter:
+```python
+AVAILBALE_VIS_METRICS = list(VisMetrics)
 
+AVAILABLE_TRANSFORMERS = {'umap'}  # {'umap', 'tsne', 'trimap'}. For now only one algorithm
+DEFAULT_TRANSFORMER_PARAMETERS = {'umap':
+                                      {'min_dist': 0.1, 'n_neighbours': 15, 'metric': 'euclidean', 'n_components': 2},
+                                  'umap_mixed':
+                                      {'min_dist': 0.1, 'n_neighbours': 15, 'metric': 'euclidean', 'n_components': 2,
+                                       'categorical_weight': 0.9}
+                                  }
 
-**POST** /visualization/jobs/<method>?refit_transformer=true
+DEFAULT_PROJECTION_PARAMETERS = {'parameters': DEFAULT_TRANSFORMER_PARAMETERS,
+                                 'use_labels': False, # do we need to use labels for more precise projections
+                                 'visualization_metrics': [VisMetrics.GLOBAL_SCORE.value],
+                                 'training_data_sample_size': 5000,
+                                 'production_data_sample_size': 500}
 
-**Data Params**
-
-    ```json
-    {        "model_name": "adult_scalar",
-             "model_version": 1
-    }
-    ```
-
-### Mongodb
-
-We use mongodb to store parameters of model visualization transformer. For each type of transformer we use separate collection. Structure of db record:
-
-```json
-{
-"model_name": "adult_scalar",
-"model_version": "1",
-"result_file": "s3://hydro-vis/adult_scalar/2/result.json",
-"transformer_file": "s3://hydro-vis/adult_scalar/2/umap_transformer",
-"parameters": {"n_neighbours": 15,
-                  "min_dist": 0.1,
-                  "metric":  "cosine"},
-"use_labels": false
-}
 ```
-
 
 # Manifold Learning Transformers
 Manifold learning is an approach to nonlinear dimensionality reduction. It is used to visualize high-dimensional datasets.
@@ -165,7 +199,7 @@ Effect of ml algorithm on preserving manifold structure in visualization[[2]](ht
 
 ## Abstract interface
 In this service common to scikit-learn algorithms interface was used.
-In [ml_transformers.transformer](../ml_transformers/transformer.py) class Transformer defines interface for all transformers that could be used
+In [ml_transformers.transformer](../app/ml_transformers/transformer.py) class Transformer defines interface for all transformers that could be used
 
 ```python
 class Transformer(ABC):

@@ -92,8 +92,8 @@ def transform(method: str):
     transforms model training and requests embedding data to lower space for visualization (100D to 2D)
     using manifold learning techniques
     :param method: umap /trimap /tsne
-            request body: see README
-            response body: see README
+            request body: see openapi
+            response body: see openapi
     :param modelVersionId: int
     :return: task_id if not found
     """
@@ -158,7 +158,7 @@ def set_params(method):
     """
     Write transformer parameters for given model in database
     so that to retrieve this data during inference of plottable embeddings in future
-        request body: see README
+        request body: see openapi
     :return: 200
     """
     request_json = request.get_json()

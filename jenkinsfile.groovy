@@ -9,9 +9,9 @@ properties([
 ])
 
 SERVICENAME = 'hydro-visualization'
-SEARCHPATH = './requirements.txt'
-SEARCHSDK = 'hydrosdk'
-SEARCHGRPC = 'hydro-serving-grpc'
+SEARCHPATH  = './requirements.txt'
+SEARCHSDK   = 'hydrosdk'
+SEARCHGRPC  = 'hydro-serving-grpc'
 REGISTRYURL = 'hydrosphere'
 GITHUBREPO  = "github.com/Hydrospheredata/hydro-visualization.git"
 
@@ -218,11 +218,11 @@ node('hydrocentral') {
                     oldVersion = getVersion()
                     bumpVersion(getVersion(),params.newVersion,params.patchVersion,'version')
                     newVersion = getVersion()
+                    bumpGrpc(sdkVersion,SEARCHSDK, params.patchVersion,SEARCHPATH) 
+                    bumpGrpc(grpcVersion,SEARCHGRPC, params.patchVersion,SEARCHPATH) 
                 } else {
                     newVersion = getVersion()
                 }
-                bumpGrpc(sdkVersion,SEARCHSDK, params.patchVersion,SEARCHPATH) 
-                bumpGrpc(grpcVersion,SEARCHGRPC, params.patchVersion,SEARCHPATH) 
                 buildDocker()
                 pushDocker(REGISTRYURL, SERVICENAME+":$newVersion")
                 //Update helm and docker-compose if release 

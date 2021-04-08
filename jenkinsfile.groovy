@@ -16,7 +16,11 @@ REGISTRYURL = 'hydrosphere'
 GITHUBREPO  = "github.com/Hydrospheredata/hydro-visualization.git"
 
 def checkoutRepo(String repo){
-  git changelog: false, credentialsId: 'HydroRobot_AccessToken', poll: false, url: repo
+  if (env.CHANGE_ID != null ){
+    git changelog: false, credentialsId: 'HydroRobot_AccessToken', poll: false, url: repo, branch: env.CHANGE_BRANCH
+  } else {
+    git changelog: false, credentialsId: 'HydroRobot_AccessToken', poll: false, url: repo, branch: env.BRANCH_NAME
+  }
 }
 
 def getVersion(){

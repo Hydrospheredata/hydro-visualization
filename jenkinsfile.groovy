@@ -136,6 +136,7 @@ def buildDocker(){
     //run build command and store build tag 
     tagVersion = getVersion() 
     sh script: "docker build -t hydrosphere/${SERVICENAME}:$tagVersion .", label: "Run build docker task";
+    sh script: "docker tag hydrosphere/${SERVICENAME}:$tagVersion hydrosphere/${SERVICENAME}:latest", label: "Run build docker task";
 }
 
 def pushDocker(String registryUrl, String dockerImage){
@@ -150,17 +151,17 @@ def pushDocker(String registryUrl, String dockerImage){
 def updateDockerCompose(String newVersion){
   dir('docker-compose'){
     //Change template
-    sh script: "sed \"s/.*image:.*/    image: hydrosphere\\/${SERVICENAME}:$newVersion/g\" ${SERVICENAME}.service.template > ${SERVICENAME}.compose", label: "sed $SERVICENAME version"
+    sh script: "sed -i \"s/.*image:.*/    image: hydrosphere\\/${SERVICENAME}:$newVersion/g\" ${SERVICENAME}.service.template", label: "sed $SERVICENAME version"
     //Merge compose into 1 file
     composeMerge = "docker-compose"
-    composeService = sh label: "Get all template", returnStdout: true, script: "ls *.compose"
+    composeService = sh label: "Get all template", returnStdout: true, script: "ls *.template"
     list = composeService.split( "\\r?\\n" )
     for(l in list){
         composeMerge = composeMerge + " -f $l"
     }
-    composeMerge = composeMerge + " config > docker-compose.yaml"
+    composeMerge = composeMerge + " config > ../docker-compose.yaml"
     sh script: "$composeMerge", label:"Merge compose file"
-    sh script: "cp docker-compose.yaml ../docker-compose.yaml"
+    //sh script: "cp docker-compose.yaml ../docker-compose.yaml"
   }
 }
 
@@ -229,6 +230,7 @@ node('hydrocentral') {
                 }
                 buildDocker()
                 pushDocker(REGISTRYURL, SERVICENAME+":$newVersion")
+                pushDocker(REGISTRYURL, SERVICENAME+":latest")
                 //Update helm and docker-compose if release 
                 if (params.releaseType == 'global'){
                     releaseService(oldVersion, newVersion)

@@ -1,4 +1,4 @@
-Age,Workclass,Education,Marital Status,Occupation,Relationship,Race,Sex,Capital Gain,Capital Loss,Hours per week,Country
+age,workclass,education,marital_status,occupation,relationship,race,sex,capital_gain,capital_loss,hours_per_week,country,class
 18,4,2,1,1,1,2,0,1,2,40,9
 27,2,2,0,5,0,2,0,2,2,28,8
 16,4,2,0,6,0,2,0,2,2,50,9

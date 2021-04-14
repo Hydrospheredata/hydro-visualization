@@ -1,0 +1,32 @@
+{
+  "definitions": {},
+  "$schema": "",
+  "$id": "http://example.com/root.json",
+  "type": "object",
+  "title": "",
+  "default": null,
+  "required": [],
+  "properties": {
+    "visualization_metrics": {
+      "$id": "#/properties/visualization_metrics",
+      "type": "array",
+      "title": "The Visualization_metrics Schema",
+      "default": null,
+      "items": {
+        "$id": "#/properties/visualization_metrics/items",
+        "type": "string",
+        "title": "The Items Schema",
+        "default": "[]",
+        "examples": [
+          "global_score",
+          "sammon_error",
+          "auc_score",
+          "stability_score",
+          "msid",
+          "clustering"
+        ],
+        "pattern": "^(.*)$"
+      }
+    }
+  }
+}

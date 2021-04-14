@@ -15,7 +15,7 @@ services:
       - AWS_STORAGE_ENDPOINT=http://minio:9000
       - AWS_BUCKET=hydrosphere-visualization-artifacts
       - AWS_REGION=
-    command: celery -A app.celery worker -Q visualization
+    command: celery -A src.utils.conf.celery worker -Q visualization
     depends_on:
       - hydrovis
       - mongodb

@@ -21,7 +21,7 @@ class TaskStates:
 
 # initialize environment variables
 try:
-    DEBUG_ENV = bool(os.getenv("DEBUG_ENV", False))
+    DEBUG_ENV = bool(os.getenv("DEBUG", False))
     APP_PORT = int(os.getenv("APP_PORT", 5000))
     GRPC_PORT = os.getenv("GRPC_PORT", 5001)
     GRPC_PROXY_ADDRESS = os.getenv("GRPC_PROXY_ADDRESS", "localhost:9090")

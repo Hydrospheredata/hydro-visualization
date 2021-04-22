@@ -1,19 +1,23 @@
-FROM python:3.8.2-slim-buster AS build
+FROM python:3.8.9-slim-buster AS build
 
 RUN apt-get update && \
     apt-get install -y -q build-essential git
 
-COPY requirements.txt requirements.txt
-RUN pip3 install --user -r requirements.txt
+RUN curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py | python -
 
+RUN python -m venv /venv
 
+WORKDIR /app/
 
-COPY version version
-COPY .git .git
+COPY . .
+
 RUN printf '{"name": "visualization", "version":"%s", "gitHeadCommit":"%s","gitCurrentBranch":"%s", "pythonVersion":"%s"}\n' "$(cat version)" "$(git rev-parse HEAD)" "$(git rev-parse --abbrev-ref HEAD)" "$(python --version)" >> buildinfo.json
 
+RUN poetry export -f requirements.txt | /venv/bin/pip install -r /dev/stdin
 
-FROM python:3.8.2-slim-buster
+RUN poetry build && /venv/bin/pip install dist/*.whl
+
+FROM python:3.8.9-slim-buster
 
 RUN useradd -u 42069 --create-home --shell /bin/bash app
 USER app

@@ -1,3 +1,4 @@
+.hs
 venv
 # Compiled python modules.
 *.pyc

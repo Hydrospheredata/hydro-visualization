@@ -35,3 +35,4 @@ COPY --chown=app:app app/ /app
 COPY --from=build --chown=app:app buildinfo.json /app/buildinfo.json
 
 WORKDIR /app
+CMD python app.py

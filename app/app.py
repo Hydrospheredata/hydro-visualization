@@ -273,7 +273,7 @@ def model_status():
 
 
 def run_flask():
-    logging.info(f"Starting http server on port ${APP_PORT}")
+    logging.info(f"Starting http server on port $APP_PORT")
     if not DEBUG_ENV:
         from gevent.pywsgi import WSGIServer
         http_server = WSGIServer(('', APP_PORT), app)
@@ -283,7 +283,7 @@ def run_flask():
 
 
 def run_grpc():
-    logging.info(f"Starting grpc server on port ${GRPC_PORT}")
+    logging.info(f"Starting grpc server on port $GRPC_PORT")
     serve()
 
 

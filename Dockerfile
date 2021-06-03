@@ -34,4 +34,4 @@ COPY --from=build --chown=app:app buildinfo.json /app/buildinfo.json
 COPY --chown=app:app start.sh /app/start.sh
 
 WORKDIR /app
-ENTRYPOINT "/app/start.sh"
+ENTRYPOINT ["/app/start.sh"]

@@ -21,6 +21,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV DEBCONF_NONINTERACTIVE_SEEN=true
 ENV UCF_FORCE_CONFOLD=1
 ENV PYTHONUNBUFFERED=1
+ENV SERVICE_MODE=service
 
 ENV PATH=/home/app/.local/bin:$PATH
 
@@ -28,10 +29,12 @@ ENV APP_PORT=5000
 EXPOSE ${APP_PORT}
 ENV GRPC_PORT=5003
 EXPOSE ${GRPC_PORT}
+
+
 COPY --from=build --chown=app:app /root/.local /home/app/.local
 COPY --chown=app:app app/ /app
 COPY --from=build --chown=app:app buildinfo.json /app/buildinfo.json
 COPY --chown=app:app start.sh /app/start.sh
 
 WORKDIR /app
-ENTRYPOINT ["/app/start.sh"]
+ENTRYPOINT /app/start.sh ${SERVICE_MODE}

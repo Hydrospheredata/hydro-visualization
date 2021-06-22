@@ -33,7 +33,6 @@ services:
       - AWS_STORAGE_ENDPOINT=http://minio:9000
       - AWS_BUCKET=hydrosphere-visualization-artifacts
       - AWS_REGION=
-    command: python app.py
     ports:
       - "5000:5000"
     depends_on:

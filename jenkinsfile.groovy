@@ -169,14 +169,14 @@ def updateHelmChart(String newVersion){
   dir('helm'){
     //Change template
     sh script: "sed -i \"s/.*full:.*/  full: hydrosphere\\/${SERVICENAME}:$newVersion/g\" visualization/values.yaml", label: "sed ${SERVICENAME} version"
-    sh script: "sed -i \"s/.*hydrosphere\\/visualization.*/    full: hydrosphere\\/${SERVICENAME}:$newVersion/g\" dev.yaml", label: "sed ${SERVICENAME} dev stage version"
+    sh script: "sed -i \"s/.*hydrosphere\\/hydro-visualization.*/    full: hydrosphere\\/${SERVICENAME}:$newVersion/g\" dev.yaml", label: "sed ${SERVICENAME} dev stage version"
 
     //Refresh readme for chart
     sh script: "frigate gen visualization --no-credits > visualization/README.md"
 
     //TODO: use atlas
     dir('visualization'){
-        sh script: "helm lint .", label: "Lint auto-od chart"
+        sh script: "helm lint .", label: "Lint visualization chart"
         sh script: "helm template -n serving --namespace hydrosphere . > test.yaml", label: "save template to file"
         sh script: "polaris audit --audit-path test.yaml -f yaml", label: "lint template by polaris"
         sh script: "polaris audit --audit-path test.yaml -f score", label: "get polaris score"

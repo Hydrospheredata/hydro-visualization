@@ -5,7 +5,7 @@ scikit-learn==0.22.2.post1
 hydrosdk==2.4.2-dev1
 git+https://github.com/xgfs/msid.git@292de7cf378a544209e3f146ae3bb8b7900b9e77
 boto3==1.12.34
-Pillow==7.1.2
+Pillow==8.2.0
 umap-learn==0.5.1
 flask_cors==3.0
 pymongo==3.10.1

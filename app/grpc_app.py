@@ -12,11 +12,11 @@ from grpc_health.v1.health_pb2 import HealthCheckResponse
 from grpc_health.v1.health_pb2_grpc import HealthServicer
 from grpc_health.v1.health_pb2_grpc import add_HealthServicer_to_server
 
-from app.ml_transformers.utils import AVAILABLE_TRANSFORMERS
-from app.transformation_tasks.tasks import perform_transform_task, TransformResult
-from app.utils.conf import MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB, GRPC_PORT
-from app.utils.conf import mongo_collection, TaskStates
-from app.utils import data_management
+from .ml_transformers.utils import AVAILABLE_TRANSFORMERS
+from .transformation_tasks.tasks import perform_transform_task, TransformResult
+from .utils.conf import GRPC_PORT
+from .utils.conf import mongo_collection, TaskStates
+from .utils import data_management
 
 
 class VisServiceServicer(VisualizationServiceServicer, HealthServicer):

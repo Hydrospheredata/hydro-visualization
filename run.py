@@ -3,10 +3,10 @@ from logging.config import fileConfig
 import threading
 
 # configure global logging policy
-fileConfig("app/utils/logging_config.conf")
+fileConfig("hydro_viz/utils/logging_config.conf")
 
-from app.app import run_flask, run_grpc
-from app.utils.conf import DEBUG_ENV
+from hydro_viz.app import run_flask, run_grpc
+from hydro_viz.utils.conf import DEBUG_ENV
 
 
 if __name__ == "__main__":

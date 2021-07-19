@@ -291,3 +291,5 @@ $RECYCLE.BIN/
 
 .vscode
 /**/.hs
+.idea
+.metals

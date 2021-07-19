@@ -8,11 +8,11 @@ import umap
 import logging
 from umap import UMAP
 
-from app.ml_transformers.metrics import (
+from hydro_viz.ml_transformers.metrics import (
     global_score, sammon_error, stability_score, auc_score, 
     intristic_multiscale_score, clustering_score
 )
-from app.ml_transformers.utils import (
+from hydro_viz.ml_transformers.utils import (
     DEFAULT_TRANSFORMER_PARAMETERS, VisMetrics, AVAILBALE_VIS_METRICS
 )
 

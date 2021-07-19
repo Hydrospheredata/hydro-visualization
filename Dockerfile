@@ -43,13 +43,13 @@ ENV GRPC_PORT=5003
 EXPOSE ${GRPC_PORT}
 
 
-COPY --chown=app:app app/ /app
-COPY --from=build --chown=app:app buildinfo.json /app/buildinfo.json
-COPY --chown=app:app start.sh /app/start.sh
+COPY --chown=app:app hydro_viz/ /hydro_viz
+COPY --from=build --chown=app:app buildinfo.json /hydro_viz/buildinfo.json
+COPY --chown=app:app start.sh /hydro_viz/start.sh
 
-WORKDIR /app
+WORKDIR /hydro_viz
 
 COPY --from=build $VENV_PATH $VENV_PATH
 COPY . ./
 
-ENTRYPOINT ["bash", "/app/start.sh"] 
+ENTRYPOINT ["bash", "/hydro_viz/start.sh"] 

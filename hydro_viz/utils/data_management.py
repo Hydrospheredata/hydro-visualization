@@ -16,11 +16,11 @@ from hydrosdk.modelversion import ModelVersion
 from hydrosdk.monitoring import MetricSpec
 from hydrosdk.servable import Servable
 
-from app.ml_transformers.utils import DEFAULT_TRANSFORMER_PARAMETERS, Coloring, get_top_N_neighbours, \
+from hydro_viz.ml_transformers.utils import DEFAULT_TRANSFORMER_PARAMETERS, Coloring, get_top_N_neighbours, \
     DEFAULT_PROJECTION_PARAMETERS
-from app.utils.conf import AWS_STORAGE_ENDPOINT, AWS_REGION, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, \
+from hydro_viz.utils.conf import AWS_STORAGE_ENDPOINT, AWS_REGION, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, \
     HS_CLUSTER_ADDRESS, HYDRO_VIS_BUCKET_NAME, EMBEDDING_FIELD, N_NEIGHBOURS
-from app.ml_transformers.autoembeddings import NOT_IGNORED_PROFILE_TYPES
+from hydro_viz.ml_transformers.autoembeddings import NOT_IGNORED_PROFILE_TYPES
 
 
 def calcualte_neighbours(embeddings: np.array) -> List[List[int]]:

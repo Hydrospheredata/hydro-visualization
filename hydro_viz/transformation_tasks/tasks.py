@@ -1,4 +1,5 @@
 import logging
+from re import I
 import sys
 from collections import namedtuple
 from datetime import datetime
@@ -10,20 +11,19 @@ from celery.exceptions import Ignore
 from hydrosdk.cluster import Cluster
 from hydrosdk.modelversion import ModelVersion
 from hydrosdk.servable import Servable
-from hydro_serving_grpc.serving.manager.api_pb2_grpc import ManagerServiceStub
-from hydro_serving_grpc.serving.manager.api_pb2 import DeployServableRequest
 
-from app.utils.conf import celery, s3manager, get_mongo_client, get_hs_cluster
-from app.ml_transformers.autoembeddings import AutoEmbeddingsEncoder, dataframe_to_feature_map, TransformationType, \
+from hydro_viz.celery_app import celery_app
+from hydro_viz.utils.conf import s3manager, get_mongo_client, get_hs_cluster
+from hydro_viz.ml_transformers.autoembeddings import AutoEmbeddingsEncoder, dataframe_to_feature_map, TransformationType, \
     NUMERICAL_TRANSFORMS
-from app.ml_transformers.transformer import transform_high_dimensional, transform_high_dimensional_mixed, \
+from hydro_viz.ml_transformers.transformer import transform_high_dimensional, transform_high_dimensional_mixed, \
     UmapTransformerWithMixedTypes
-from app.ml_transformers.utils import VisMetrics, DEFAULT_PROJECTION_PARAMETERS
-from app.utils.conf import (
+from hydro_viz.ml_transformers.utils import VisMetrics, DEFAULT_PROJECTION_PARAMETERS
+from hydro_viz.utils.conf import (
     HYDRO_VIS_BUCKET_NAME, TaskStates, EMBEDDING_FIELD, MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS,
     MONGO_AUTH_DB, HS_CLUSTER_ADDRESS, GRPC_PROXY_ADDRESS,
 )
-from app.utils import data_management
+from hydro_viz.utils import data_management
 
 
 TransformResult = namedtuple('TransformResult', 'state raise_error meta result')
@@ -41,15 +41,9 @@ def get_embeddings(
         training_embeddings = None
     else:
         try:
-            manager_stub = ManagerServiceStub(channel=hs_cluster.channel)
-            deploy_request = DeployServableRequest(
-                version_id=model.id,
-                metadata={"created_by": "hydro_vis"}
-            )
-            for servable_proto in manager_stub.DeployServable(deploy_request):
-                logging.info(f"{servable_proto.name} is {servable_proto.ServableStatus.Name(servable_proto.status)}")
-            if servable_proto.status != 3:
-                raise ValueError(f"Invalid servable state came from GRPC stream - {servable_proto.ServableStatus.Name(servable_proto.status)}")
+            servable_proto = Servable.create(cluster=hs_cluster, model_name=model.name, version=model.version)
+            servable_proto.lock_while_starting()
+
             servable = Servable.find_by_name(hs_cluster, servable_name=servable_proto.name)
         except Exception as e:
             logging.error(f"Couldn't create {repr(model)} servable. Error:{e}")
@@ -102,9 +96,11 @@ def generate_auto_embeddings(
         [training_numerical_embeddings, training_categorical_embeddings], encoder
 
 
-@celery.task(bind=True, track_started=True)
+@celery_app.task(bind=True, track_started=True)
 def transform_task(self, method, model_version_id):
+    logging.info("start task")
     task_result: TransformResult = perform_transform_task(method, model_version_id)
+    logging.info("counted")
     if task_result.raise_error:
         self.update_state(state=task_result.state, meta=task_result.meta)
         raise Ignore()
@@ -117,6 +113,7 @@ def transform_task(self, method, model_version_id):
 
 def perform_transform_task(method: str, model_version_id: int) -> TransformResult:
     start = datetime.now()
+    logging.info("start")
     s3_model_path = f's3://{HYDRO_VIS_BUCKET_NAME}/{model_version_id}'  # TODO make management of S3 bucket storage to check if model in storage is correct
     s3manager.fs.mkdirs(s3_model_path, exist_ok=True)
 
@@ -130,6 +127,7 @@ def perform_transform_task(method: str, model_version_id: int) -> TransformResul
     path_to_result_file = db_model_info.get('result_file', '')
     path_to_encoder = db_model_info.get('encoder_file', '')
 
+    logging.info("read json")
     if path_to_result_file:
         plottable_result = s3manager.read_json(filepath=path_to_result_file)
         if plottable_result:
@@ -148,6 +146,7 @@ def perform_transform_task(method: str, model_version_id: int) -> TransformResul
     production_data_sample_size = db_model_info.get(
         'production_data_sample_size', DEFAULT_PROJECTION_PARAMETERS['production_data_sample_size'])
 
+    logging.info("try")
     try:
         model = ModelVersion.find_by_id(hs_cluster, int(model_version_id))
         model_name = model.name
@@ -177,6 +176,7 @@ def perform_transform_task(method: str, model_version_id: int) -> TransformResul
             result=None
         )
 
+    logging.info("joblib")
     transformer = s3manager.load_with_joblib(path_to_transformer) if path_to_transformer else None 
     autoembeddings_encoder = s3manager.load_with_joblib(path_to_encoder) if path_to_encoder else None
 
@@ -192,6 +192,7 @@ def perform_transform_task(method: str, model_version_id: int) -> TransformResul
     else:
         training_df = None
     
+    logging.info("get prod subsample")
     production_requests_df = data_management.get_production_subsample(model.id, production_data_sample_size)
     if production_requests_df.empty:
         return TransformResult(
@@ -208,9 +209,11 @@ def perform_transform_task(method: str, model_version_id: int) -> TransformResul
             result=None
         )
 
+    logging.info("ifexists")
     if embeddings_exist:
         production_embeddings, training_embeddings = get_embeddings(
             production_requests_df, training_df, training_data_sample_size, hs_cluster, model)
+        logging.info("got embeddings")
         if production_embeddings is None or training_embeddings is None:
             if production_embeddings is None:
                 message = "Production embeddings are unavailable"
@@ -223,11 +226,12 @@ def perform_transform_task(method: str, model_version_id: int) -> TransformResul
                 result=None
             )
     else:
+        logging.info("if not exists")
         [production_numerical_embeddings, production_categorical_embeddings], \
             [training_numerical_embeddings, training_categorical_embeddings], \
             autoembeddings_encoder = generate_auto_embeddings(
                 production_requests_df, training_df, model, encoder=autoembeddings_encoder)
-
+        logging.info("generated auto emb")
         if training_numerical_embeddings is not None and training_categorical_embeddings is None:  # Only numerical features are used
             production_embeddings, training_embeddings = production_numerical_embeddings, training_numerical_embeddings
         elif training_categorical_embeddings is not None and training_numerical_embeddings is None:  # Only categorical features are used
@@ -247,6 +251,7 @@ def perform_transform_task(method: str, model_version_id: int) -> TransformResul
 
     if isinstance(training_embeddings, np.ndarray):  
         # not mixed-type data
+        logging.info("calculate")
         top_N_neighbours = data_management.calcualte_neighbours(production_embeddings)
         plottable_result, transformer = transform_high_dimensional(
             method, parameters, training_embeddings, production_embeddings, transformer, vis_metrics=vis_metrics)
@@ -256,9 +261,12 @@ def perform_transform_task(method: str, model_version_id: int) -> TransformResul
         plottable_result, transformer = transform_high_dimensional_mixed(
             method, parameters, training_embeddings, production_embeddings)
 
+    logging.info("got plottable res")
     requests_data_dict = data_management.parse_requests_dataframe(
         production_requests_df, hs_cluster, model, top_N_neighbours)
     plottable_result.update(requests_data_dict)
+
+    logging.info("parsed request data frame")
 
     path_to_result_file = s3_model_path + '/result.json'
     try:
@@ -267,6 +275,8 @@ def perform_transform_task(method: str, model_version_id: int) -> TransformResul
     except:
         e = sys.exc_info()[1]
         logging.error(f'Couldn\'t save result to {path_to_result_file}: {e}')
+
+    logging.info("wrote to s3")
 
     if type(transformer) != UmapTransformerWithMixedTypes:  
         # MixedTypes is used only with fit_transform

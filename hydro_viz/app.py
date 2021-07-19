@@ -1,18 +1,26 @@
 import logging
-from typing import List
-
+import faulthandler
 from flask import request
 from hydrosdk.modelversion import ModelVersion
 
 from .grpc_app import serve
 from .ml_transformers.autoembeddings import NOT_IGNORED_PROFILE_TYPES
 from .ml_transformers.utils import AVAILABLE_TRANSFORMERS, DEFAULT_PROJECTION_PARAMETERS
-from .utils.conf import DEBUG_ENV, \
-    APP_PORT, EMBEDDING_FIELD, GRPC_PORT, URL_PREFIX, BUILDINFO
-from .utils.conf import app, hs_cluster, mongo_collection, params_validator, TaskStates
+from .utils.conf import DEBUG_ENV, APP_PORT, EMBEDDING_FIELD, GRPC_PORT, URL_PREFIX, BUILDINFO
+from .utils.conf import hs_cluster, mongo_collection, params_validator, TaskStates
 from .utils import data_management
 from .utils.logs import disable_logging
+
 from .transformation_tasks.tasks import transform_task
+
+from celery import Celery
+from flask import Flask
+from flask_cors import CORS
+
+faulthandler.enable()
+
+app = Flask(__name__)
+CORS(app)
 
 
 @app.route(URL_PREFIX + "/health", methods=['GET'])

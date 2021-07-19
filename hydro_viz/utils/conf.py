@@ -2,14 +2,11 @@ import os
 import json
 import logging
 
-from celery import Celery
 from pymongo import MongoClient
-from flask import Flask
-from flask_cors import CORS
 from jsonschema import Draft7Validator
 from hydrosdk.cluster import Cluster
 
-from app.utils.s3manager import S3Manager
+from .s3manager import S3Manager
 
 
 class TaskStates:
@@ -66,8 +63,8 @@ def load_configuration():
     global mongo_client
     global mongo_collection
     global s3manager
-    global app
-    global celery
+    # global app
+    # global celery
     global hs_cluster
     global hs_cluster_factory
     
@@ -81,33 +78,33 @@ def load_configuration():
     s3manager = S3Manager(HYDRO_VIS_BUCKET_NAME, AWS_STORAGE_ENDPOINT, AWS_REGION)
 
     # initialize flask application
-    logging.info("Initializing Flask")
-    app = Flask(__name__)
-    CORS(app)
+    # logging.info("Initializing Flask")
+    # app = Flask(__name__)
+    # CORS(app)
 
     # initialize celery
-    logging.info("Initializing Celery")
-    connection_string = f"mongodb://{MONGO_URL}:{MONGO_PORT}"
-    if MONGO_USER is not None and MONGO_PASS is not None:
-        connection_string = f"mongodb://{MONGO_USER}:{MONGO_PASS}@{MONGO_URL}:{MONGO_PORT}"
-    app.config['CELERY_BROKER_URL'] = f"{connection_string}/celery_broker?authSource={MONGO_AUTH_DB}"
-    app.config['CELERY_RESULT_BACKEND'] = f"{connection_string}/celery_backend?authSource={MONGO_AUTH_DB}"
+    # logging.info("Initializing Celery")
+    # connection_string = f"mongodb://{MONGO_URL}:{MONGO_PORT}"
+    # if MONGO_USER is not None and MONGO_PASS is not None:
+    #     connection_string = f"mongodb://{MONGO_USER}:{MONGO_PASS}@{MONGO_URL}:{MONGO_PORT}"
+    # app.config['CELERY_BROKER_URL'] = f"{connection_string}/celery_broker?authSource={MONGO_AUTH_DB}"
+    # app.config['CELERY_RESULT_BACKEND'] = f"{connection_string}/celery_backend?authSource={MONGO_AUTH_DB}"
 
-    celery = Celery(
-        app.import_name,
-        backend=app.config['CELERY_RESULT_BACKEND'],
-        broker=app.config['CELERY_BROKER_URL']
-    )
-    celery.conf.update(app.config)
+    # celery = Celery(
+    #     app.import_name,
+    #     backend=app.config['CELERY_RESULT_BACKEND'],
+    #     broker=app.config['CELERY_BROKER_URL']
+    # )
+    # celery.conf.update(app.config)
 
-    class ContextTask(celery.Task):
-        def __call__(self, *args, **kwargs):
-            with app.app_context():
-                return self.run(*args, **kwargs)
+    # class ContextTask(celery.Task):
+    #     def __call__(self, *args, **kwargs):
+    #         with app.app_context():
+    #             return self.run(*args, **kwargs)
     
-    celery.Task = ContextTask
-    celery.autodiscover_tasks(["app.transformation_tasks.tasks"], force=True)
-    celery.conf.update({"CELERY_DISABLE_RATE_LIMITS": True})
+    # celery.Task = ContextTask
+    # celery.autodiscover_tasks(["app.transformation_tasks.tasks"], force=True)
+    # celery.conf.update({"CELERY_DISABLE_RATE_LIMITS": True})
 
     # initialize Hydrosphere client
     logging.info(f"Initializing hydrosphere client with http_endpoint={HS_CLUSTER_ADDRESS} and grpc_endpoint={GRPC_PROXY_ADDRESS}")
@@ -118,8 +115,8 @@ def load_configuration():
 mongo_client = None
 mongo_collection = None
 s3manager = None
-app = None
-celery = None
+# app = None
+# celery = None
 hs_cluster = None
 
 load_configuration()
@@ -128,6 +125,6 @@ load_configuration()
 with open("buildinfo.json") as f:
     BUILDINFO = json.load(f)
 
-with open('app/utils/hydro-vis-params-json-schema.json') as f:
+with open('hydro_viz/utils/hydro-vis-params-json-schema.json') as f:
     REQUEST_JSON_SCHEMA = json.load(f)
     params_validator = Draft7Validator(REQUEST_JSON_SCHEMA)

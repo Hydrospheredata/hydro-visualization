@@ -112,6 +112,11 @@ def transform_task(self, method, model_version_id):
     if task_result.result is not None:
         return task_result.result
     else:
+        logging.error(task_result)
+        logging.error(task_result.raise_error)
+        logging.error(task_result.state)
+        logging.error(task_result.meta)
+        logging.error(task_result.result)
         self.update_state(state=TaskStates.ERROR, meta={})
         raise Ignore()
 

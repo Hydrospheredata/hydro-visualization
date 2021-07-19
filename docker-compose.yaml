@@ -1,10 +1,9 @@
 version: '3.5'
 
 services:
-
-
   hydrovis-worker:
-    build: .
+    build: 
+      context: .
     environment:
       - MONGO_URL=mongodb
       - GRPC_UI_ADDRESS=
@@ -15,14 +14,17 @@ services:
       - AWS_STORAGE_ENDPOINT=http://minio:9000
       - AWS_BUCKET=hydrosphere-visualization-artifacts
       - AWS_REGION=
-    command: celery -A app.celery worker -Q visualization
+      - SERVICE_MODE=service
     depends_on:
       - hydrovis
       - mongodb
       - minio
 
   hydrovis:
-    build: .
+    build:
+      context: .
+      args: 
+        - SERVICE_MODE=worker
     environment:
       - MONGO_URL=mongodb
       - GRPC_UI_ADDRESS=

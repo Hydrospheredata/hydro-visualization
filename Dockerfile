@@ -1,17 +1,32 @@
-FROM python:3.8.9-slim-buster AS build
+FROM python:3.8.9-slim-buster as python-base
+ENV POETRY_PATH=/opt/poetry \
+    VENV_PATH=/opt/venv \
+    POETRY_VERSION=1.1.6
+ENV PATH="$POETRY_PATH/bin:$VENV_PATH/bin:$PATH"
+
+
+FROM python-base AS build
 
 RUN apt-get update && \
-    apt-get install -y -q build-essential git
+    apt-get install -y -q build-essential \
+    git \
+    curl
 
-COPY requirements.txt requirements.txt
-RUN pip3 install --user -r requirements.txt
+RUN curl -sSL https://raw.githubusercontent.com/sdispater/poetry/master/get-poetry.py | python
+RUN mv /root/.poetry $POETRY_PATH
+RUN python -m venv $VENV_PATH
+RUN poetry config virtualenvs.create false
+
+COPY poetry.lock pyproject.toml ./
+RUN poetry install --no-interaction --no-ansi -vvv
+
 
 COPY version version
 COPY . ./
 RUN printf '{"name": "visualization", "version":"%s", "gitHeadCommit":"%s","gitCurrentBranch":"%s", "pythonVersion":"%s"}\n' "$(cat version)" "$(git rev-parse HEAD)" "$(git rev-parse --abbrev-ref HEAD)" "$(python --version)" >> buildinfo.json
 
 
-FROM python:3.8.9-slim-buster
+FROM python-base as runtime
 
 RUN useradd -u 42069 --create-home --shell /bin/bash app
 USER app
@@ -21,9 +36,6 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV DEBCONF_NONINTERACTIVE_SEEN=true
 ENV UCF_FORCE_CONFOLD=1
 ENV PYTHONUNBUFFERED=1
-ENV SERVICE_MODE=service
-
-ENV PATH=/home/app/.local/bin:$PATH
 
 ENV APP_PORT=5000
 EXPOSE ${APP_PORT}
@@ -31,10 +43,13 @@ ENV GRPC_PORT=5003
 EXPOSE ${GRPC_PORT}
 
 
-COPY --from=build --chown=app:app /root/.local /home/app/.local
-COPY --chown=app:app app/ /app
-COPY --from=build --chown=app:app buildinfo.json /app/buildinfo.json
-COPY --chown=app:app start.sh /app/start.sh
+COPY --chown=app:app hydro_viz/ /hydro_viz
+COPY --from=build --chown=app:app buildinfo.json /hydro_viz/buildinfo.json
+COPY --chown=app:app start.sh /hydro_viz/start.sh
 
-WORKDIR /app
-ENTRYPOINT /app/start.sh ${SERVICE_MODE}
+WORKDIR /hydro_viz
+
+COPY --from=build $VENV_PATH $VENV_PATH
+COPY . ./
+
+ENTRYPOINT ["bash", "/hydro_viz/start.sh"] 

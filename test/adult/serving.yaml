@@ -1,14 +1,14 @@
 
 kind: Model
-name: "adult_scalar_vis_test"
+name: adult_scalar_vis_test
 payload:
-  - "model/src/"
-  - "model/requirements.txt"
-  - "model/classification_model.joblib"
-runtime: "hydrosphere/serving-runtime-python-3.6:0.1.2-rc0"
-install-command: "pip install -r requirements.txt"
-training-data: data/profile2.csv
-contract:
+  - src/
+  - requirements.txt
+runtime: runtime:latest
+source-path: model/
+install-command: pip install -r requirements.txt
+training-data: /Users/tidylobster/Projects/proj-hydrosphere/hydro-visualization/test/adult/data/profile.csv
+signature:
   name: "predict"
   inputs:
     age:
@@ -60,7 +60,7 @@ contract:
       type: int64
       profile: nominal
   outputs:
-    some_embedding:
+    embedding:
       shape: [1, 100]
       type: double
       profile: numerical
@@ -72,13 +72,8 @@ contract:
       shape: scalar
       type: int64
       profile: numerical
-    kek:
-      shape: scalar
-      type: int64
-      profile: categorical
-
 ---
 kind: Application
 name: adult_scalar_vis_test
 singular:
-  model: adult_scalar_vis_test:1
+  model: "{{this.model.adult_scalar_vis_test}}"

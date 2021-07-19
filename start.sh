@@ -8,9 +8,9 @@ if [ -z "$1" ]; then
 fi
 
 if [ "$1" = 'service' ]; then
-    python app.py
+    python run.py
 elif [ "$1" = 'worker' ]; then
-    celery -A app.celery worker -l info -Q visualization
+    celery -A hydro_viz.celery_app worker -l info -E -Q visualization
 else
     echo "'$1' mode is incorrect. Supported modes are 'service' or 'worker'"
     exit 1

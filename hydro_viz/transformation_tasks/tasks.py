@@ -162,15 +162,6 @@ def perform_transform_task(method: str, model_version_id: int) -> TransformResul
         model_name = model.name
         model_version = model.version
         embeddings_exist = data_management.model_has_correct_embeddings_field(model)
-        if not embeddings_exist:
-            message = f'Model {repr(model_version)} does not have {EMBEDDING_FIELD} field in output signature'
-            logging.info(message)
-            return TransformResult(
-                state=TaskStates.NOT_SUPPORTED,
-                raise_error=False,
-                meta={'message': message, 'code': 400},
-                result=None
-            )
     except ValueError as e:
         return TransformResult(
             state=TaskStates.ERROR, 

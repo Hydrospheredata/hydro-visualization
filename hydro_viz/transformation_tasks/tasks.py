@@ -102,6 +102,11 @@ def transform_task(self, method, model_version_id):
     task_result: TransformResult = perform_transform_task(method, model_version_id)
     logging.info("counted")
     if task_result.raise_error:
+        logging.error(task_result)
+        logging.error(task_result.raise_error)
+        logging.error(task_result.state)
+        logging.error(task_result.meta)
+        logging.error(task_result.result)
         self.update_state(state=task_result.state, meta=task_result.meta)
         raise Ignore()
     if task_result.result is not None:

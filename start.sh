@@ -8,7 +8,7 @@ if [ -z "$1" ]; then
 fi
 
 if [ "$1" = 'service' ]; then
-    python run.py
+    python -m hydro_viz.run
 elif [ "$1" = 'worker' ]; then
     celery -A hydro_viz.celery_app worker -l info -E -Q visualization
 else

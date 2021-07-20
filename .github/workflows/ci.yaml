@@ -57,11 +57,11 @@ jobs:
         uses: abatilo/actions-poetry@v2.1.0
 
         # Update dependency
-      - name: Bump sdk
-        run: |
-          SDK_VERSION=$(curl -Ls https://pypi.org/pypi/hydrosdk/json | jq -r '.releases | keys[]' | sort -V | tail -n 1)
-          echo $SDK_VERSION
-          poetry add hydrosdk=$SDK_VERSION
+        # - name: Bump sdk
+        #   run: |
+        #     SDK_VERSION=$(curl -Ls https://pypi.org/pypi/hydrosdk/json | jq -r '.releases | keys[]' | sort -V | tail -n 1)
+        #     echo $SDK_VERSION
+        #     poetry add hydrosdk=$SDK_VERSION
 
       - name: Install dependencies
         run: poetry install

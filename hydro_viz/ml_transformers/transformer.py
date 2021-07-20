@@ -200,7 +200,7 @@ class UmapTransformerWithMixedTypes(UmapTransformer):
                     weight=self.categorical_weight
                 )
                 intersection = umap.umap_.reset_local_connectivity(intersection)
-                embedding = umap.umap_.simplicial_set_embedding(
+                embedding, aux_data = umap.umap_.simplicial_set_embedding(
                     data=self.transformer_categorical._raw_data,
                     graph=intersection,
                     n_components=self.transformer_categorical.n_components,

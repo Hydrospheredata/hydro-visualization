@@ -215,6 +215,8 @@ class UmapTransformerWithMixedTypes(UmapTransformer):
                     metric=self.transformer_categorical.metric,
                     metric_kwds=self.transformer_categorical._metric_kwds,
                     densmap=False,
+                    densmap_kwds={},
+                    output_dens=False,
                     euclidean_output=False
                 )
 

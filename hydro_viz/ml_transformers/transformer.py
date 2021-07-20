@@ -9,7 +9,7 @@ import logging
 from umap import UMAP
 
 from hydro_viz.ml_transformers.metrics import (
-    global_score, sammon_error, stability_score, auc_score, 
+    global_score, sammon_error, stability_score, auc_score,
     intristic_multiscale_score, clustering_score
 )
 from hydro_viz.ml_transformers.utils import (
@@ -193,7 +193,7 @@ class UmapTransformerWithMixedTypes(UmapTransformer):
                 else:
                     self.transformer.fit(X)
                     self.transformer_categorical.fit(X_categorical)
-                
+
                 intersection = umap.umap_.general_simplicial_set_intersection(
                     self.transformer_categorical.graph_,
                     self.transformer.graph_,
@@ -201,16 +201,21 @@ class UmapTransformerWithMixedTypes(UmapTransformer):
                 )
                 intersection = umap.umap_.reset_local_connectivity(intersection)
                 embedding = umap.umap_.simplicial_set_embedding(
-                    self.transformer_categorical._raw_data,
-                    intersection, self.transformer_categorical.n_components,
-                    self.transformer_categorical._initial_alpha,
-                    self.transformer_categorical._a,
-                    self.transformer_categorical._b,
-                    self.transformer_categorical.repulsion_strength,
-                    self.transformer_categorical.negative_sample_rate,
-                    200, 'random', np.random,
-                    self.transformer_categorical.metric,
-                    self.transformer_categorical._metric_kwds, False
+                    data=self.transformer_categorical._raw_data,
+                    graph=intersection,
+                    n_components=self.transformer_categorical.n_components,
+                    initial_alpha=self.transformer_categorical._initial_alpha,
+                    a=self.transformer_categorical._a,
+                    b=self.transformer_categorical._b,
+                    gamma=self.transformer_categorical.repulsion_strength,
+                    negative_sample_rate=self.transformer_categorical.negative_sample_rate,
+                    n_epochs=200,
+                    init='random',
+                    random_state=np.random,
+                    metric=self.transformer_categorical.metric,
+                    metric_kwds=self.transformer_categorical._metric_kwds,
+                    densmap=False,
+                    euclidean_output=False
                 )
 
                 self.numerical_embedding_ = self.transformer.embedding_
@@ -225,9 +230,9 @@ class UmapTransformerWithMixedTypes(UmapTransformer):
         raise NotImplementedError(f'{self.__class__.__name__} cannot transform data. Use fit_transform() instead.')
 
     def eval(
-            self, 
-            X: np.ndarray, 
-            _X: np.ndarray, 
+            self,
+            X: np.ndarray,
+            _X: np.ndarray,
             y=None,
             evaluation_metrics: Tuple[VisMetrics] = tuple(AVAILBALE_VIS_METRICS),
             _auc_cv=5
@@ -239,7 +244,7 @@ class UmapTransformerWithMixedTypes(UmapTransformer):
 
 
 def transform_high_dimensional(
-        method: str, 
+        method: str,
         parameters: Dict,
         training_embeddings: Optional[np.ndarray],
         production_embeddings: np.ndarray,
@@ -304,15 +309,15 @@ def transform_high_dimensional(
 
 
 def transform_high_dimensional_mixed(
-        method: str, 
+        method: str,
         parameters: Dict,
         training_embeddings: List[np.ndarray],
         production_embeddings: List[np.ndarray]
 ) -> Tuple[Dict, Transformer]:
     """
-    Transforms data of mixed type. This method uses only fit_transform method and requires 
+    Transforms data of mixed type. This method uses only fit_transform method and requires
     specific transformer that handlex mixed types. It doesn't compute vis_metrics of transformation.
-    
+
     :param method: transformer method
     :param parameters: Dict
     :param training_embeddings: List[np.array] has two numpy arrays - [numerical_embeddings, categorical_embeddings]

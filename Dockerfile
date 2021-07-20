@@ -7,6 +7,11 @@ ENV PATH="$POETRY_PATH/bin:$VENV_PATH/bin:$PATH"
 
 FROM python-base AS build
 
+ENV DEBIAN_FRONTEND=noninteractive
+ENV DEBCONF_NONINTERACTIVE_SEEN=true
+ENV UCF_FORCE_CONFOLD=1
+ENV PYTHONUNBUFFERED=1
+
 RUN apt-get update && \
     apt-get install -y -q build-essential \
     git \
@@ -19,7 +24,6 @@ RUN poetry config virtualenvs.create false
 
 COPY poetry.lock pyproject.toml ./
 RUN poetry install --no-interaction --no-ansi -vvv
-
 
 COPY version version
 COPY . ./
@@ -41,7 +45,6 @@ ENV APP_PORT=5000
 EXPOSE ${APP_PORT}
 ENV GRPC_PORT=5003
 EXPOSE ${GRPC_PORT}
-
 
 COPY --chown=app:app hydro_viz/ /hydro_viz
 COPY --from=build --chown=app:app buildinfo.json /hydro_viz/buildinfo.json

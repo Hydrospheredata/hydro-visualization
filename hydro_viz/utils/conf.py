@@ -10,10 +10,10 @@ from .s3manager import S3Manager
 
 
 class TaskStates:
-    SUCCESS = 'SUCCESS'
-    NOT_SUPPORTED = 'NOT_SUPPORTED'
-    ERROR = 'ERROR'
-    NO_DATA = 'NO_DATA'
+    SUCCESS = "SUCCESS"
+    NOT_SUPPORTED = "NOT_SUPPORTED"
+    ERROR = "ERROR"
+    NO_DATA = "NO_DATA"
 
 
 # initialize environment variables
@@ -29,15 +29,15 @@ try:
     MONGO_AUTH_DB = os.getenv("MONGO_AUTH_DB", "admin")
     MONGO_USER = os.getenv("MONGO_USER")
     MONGO_PASS = os.getenv("MONGO_PASS")
-    AWS_STORAGE_ENDPOINT = os.getenv('AWS_STORAGE_ENDPOINT', '')
-    AWS_REGION = os.getenv('AWS_REGION', '')
-    HYDRO_VIS_BUCKET_NAME = os.getenv('AWS_BUCKET', 'visualization-artifacts')
-    AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY', '')
-    AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID', '')
-    EMBEDDING_FIELD = 'embedding'
+    AWS_STORAGE_ENDPOINT = os.getenv("AWS_STORAGE_ENDPOINT", "")
+    AWS_REGION = os.getenv("AWS_REGION", "")
+    HYDRO_VIS_BUCKET_NAME = os.getenv("AWS_BUCKET", "visualization-artifacts")
+    AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY", "")
+    AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID", "")
+    EMBEDDING_FIELD = "embedding"
     MINIMUM_PROD_DATA_SIZE = 10
     N_NEIGHBOURS = 100
-    URL_PREFIX = os.getenv('URL_PREFIX', '/visualization')
+    URL_PREFIX = os.getenv("URL_PREFIX", "/visualization")
 except ValueError as e:
     logging.error(f"Couldn't read service configuration at start up. Error: {e}")
     raise e
@@ -45,17 +45,17 @@ except ValueError as e:
 
 def get_mongo_client(host, port, user, pswd, auth_db):
     return MongoClient(
-        host=host, 
-        port=port, 
+        host=host,
+        port=port,
         maxPoolSize=200,
-        username=user, 
+        username=user,
         password=pswd,
-        authSource=auth_db
+        authSource=auth_db,
     )
 
 
 def get_hs_cluster(http, grpc):
-    return Cluster(http, grpc)
+    return Cluster(http, grpc, check_connection=False)
 
 
 def load_configuration():
@@ -67,14 +67,20 @@ def load_configuration():
     # global celery
     global hs_cluster
     global hs_cluster_factory
-    
+
     # initialize mongo client factory
-    logging.info(f"Initializing mongo client with host={MONGO_URL}, port={MONGO_PORT}, user={MONGO_USER}, pass=..., auth_db={MONGO_AUTH_DB}")
-    mongo_client = get_mongo_client(MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB)
+    logging.info(
+        f"Initializing mongo client with host={MONGO_URL}, port={MONGO_PORT}, user={MONGO_USER}, pass=..., auth_db={MONGO_AUTH_DB}"
+    )
+    mongo_client = get_mongo_client(
+        MONGO_URL, MONGO_PORT, MONGO_USER, MONGO_PASS, MONGO_AUTH_DB
+    )
     mongo_collection = mongo_client["visualization"]
 
     # initialize s3 client
-    logging.info(f"Initializing S3Manager instance with bucket={HYDRO_VIS_BUCKET_NAME}, endpoint={AWS_STORAGE_ENDPOINT}, region={AWS_REGION}")
+    logging.info(
+        f"Initializing S3Manager instance with bucket={HYDRO_VIS_BUCKET_NAME}, endpoint={AWS_STORAGE_ENDPOINT}, region={AWS_REGION}"
+    )
     s3manager = S3Manager(HYDRO_VIS_BUCKET_NAME, AWS_STORAGE_ENDPOINT, AWS_REGION)
 
     # initialize flask application
@@ -101,13 +107,15 @@ def load_configuration():
     #     def __call__(self, *args, **kwargs):
     #         with app.app_context():
     #             return self.run(*args, **kwargs)
-    
+
     # celery.Task = ContextTask
     # celery.autodiscover_tasks(["app.transformation_tasks.tasks"], force=True)
     # celery.conf.update({"CELERY_DISABLE_RATE_LIMITS": True})
 
     # initialize Hydrosphere client
-    logging.info(f"Initializing hydrosphere client with http_endpoint={HS_CLUSTER_ADDRESS} and grpc_endpoint={GRPC_PROXY_ADDRESS}")
+    logging.info(
+        f"Initializing hydrosphere client with http_endpoint={HS_CLUSTER_ADDRESS} and grpc_endpoint={GRPC_PROXY_ADDRESS}"
+    )
     hs_cluster = get_hs_cluster(HS_CLUSTER_ADDRESS, GRPC_PROXY_ADDRESS)
 
 
@@ -125,6 +133,6 @@ load_configuration()
 with open("buildinfo.json") as f:
     BUILDINFO = json.load(f)
 
-with open('hydro_viz/utils/hydro-vis-params-json-schema.json') as f:
+with open("hydro_viz/utils/hydro-vis-params-json-schema.json") as f:
     REQUEST_JSON_SCHEMA = json.load(f)
     params_validator = Draft7Validator(REQUEST_JSON_SCHEMA)

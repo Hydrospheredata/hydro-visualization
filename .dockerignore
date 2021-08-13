@@ -1,4 +1,14 @@
 .ipynb_checkpoints
 test
+docs
+.dockerignore
+.gitignore
+.gitattributes
+.flake8
+docker-compose.yaml
+Dockerfile*
 .idea
 venv
+openapi.yaml
+.vscode
+README.md

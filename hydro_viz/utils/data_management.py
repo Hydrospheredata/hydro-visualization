@@ -188,7 +188,10 @@ def get_production_subsample(model_id, size=1000) -> pd.DataFrame:
     r = requests.get(f'{HS_CLUSTER_ADDRESS}/monitoring/checks/subsample/{model_id}?size={size}')
     if r.status_code != 200:
         return pd.DataFrame()
-    return pd.DataFrame.from_dict(r.json())
+
+    checks = r.json()
+    checksWithoutError = list(filter(lambda x: x.get('_hs_error') == None, checks))
+    return pd.DataFrame.from_dict(checksWithoutError)
 
 
 def model_has_production_data(model_id) -> bool:

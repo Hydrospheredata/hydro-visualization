@@ -210,7 +210,7 @@ def model_has_correct_embeddings_field(model: ModelVersion) -> bool:
     """
     output_names = { field.name : field for field in model.signature.outputs }
     if EMBEDDING_FIELD not in output_names:
-        logging.info(f'Model {model.name}v{model.version} has no outpit {EMBEDDING_FIELD} field')
+        logging.info(f'Model {model.name}v{model.version} has no output {EMBEDDING_FIELD} field')
         return False
     embedding_field_shape = list(output_names[EMBEDDING_FIELD].shape.dims)
     shape_is_correct = len(embedding_field_shape) == 2 and embedding_field_shape[0] == 1

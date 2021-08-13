@@ -134,6 +134,9 @@ jobs:
       with:
         push: true
         tags: ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ env.VERSION }}
+        build-args: |
+            GIT_HEAD_COMMIT=${{ github.sha }}
+            GIT_CURRENT_BRANCH=${{ github.ref }}
         
     - name: Image digest
       run: echo ${{ steps.docker_build.outputs.digest }}

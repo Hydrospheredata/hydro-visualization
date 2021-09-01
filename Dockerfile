@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM python:3.8-slim as python-base
+FROM python:3.8.11-slim-bullseye as python-base
 LABEL maintainer="support@hydrosphere.io"
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -8,6 +8,8 @@ ENV PYTHONUNBUFFERED=1 \
     POETRY_VERSION=1.1.6
 
 ENV PATH="$POETRY_PATH/bin:$VENV_PATH/bin:$PATH"
+RUN apt-get update && apt-get install -y -q --no-install-recommends \
+    libssl1.1>=1.1.1 openssl>=1.1.1 && rm -rf /var/lib/apt/lists/*
 
 
 FROM python-base AS build
@@ -18,7 +20,8 @@ ENV DEBIAN_FRONTEND=noninteractive \
     UCF_FORCE_CONFOLD=1 
 
 RUN apt-get update && \
-    apt-get install -y -q build-essential \
+    apt-get install -y -q --no-install-recommends \
+    build-essential \
     curl \
     git && \
     curl -sSL https://raw.githubusercontent.com/sdispater/poetry/master/get-poetry.py | python && \

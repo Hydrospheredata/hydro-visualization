@@ -90,7 +90,7 @@ jobs:
       - name: Cache Docker layers
         uses: actions/cache@v2
         with:
-          path: /tmp/.buildx-cache
+          path: /tmp/.buildxtest-cache
           key: ${{ runner.os }}-buildx-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}-buildx-
@@ -102,8 +102,8 @@ jobs:
           push: true
           builder: ${{ steps.buildx.outputs.name }}
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ env.TAG }}
-          cache-from: type=local,src=/tmp/.buildx-cache
-          cache-to: type=local,dest=/tmp/.buildx-cache-new
+          cache-from: type=local,src=/tmp/.buildxtest-cache
+          cache-to: type=local,dest=/tmp/.buildxtest-cache-new
           build-args: |
             GIT_HEAD_COMMIT=${{ github.sha }}
             GIT_CURRENT_BRANCH=${{ github.ref }}
@@ -112,8 +112,8 @@ jobs:
       # https://github.com/docker/build-push-action/issues/252
       - name: Move cache
         run: |
-          rm -rf /tmp/.buildx-cache
-          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+          rm -rf /tmp/.buildxtest-cache
+          mv /tmp/.buildxtest-cache-new /tmp/.buildxtest-cache
           
       - name: Image digest
         run: echo ${{ steps.docker_build.outputs.digest }}  

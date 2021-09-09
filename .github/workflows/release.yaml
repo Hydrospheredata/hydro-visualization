@@ -135,7 +135,9 @@ jobs:
       uses: docker/build-push-action@v2
       with:
         push: true
-        tags: ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ env.VERSION }}
+        tags: |
+          ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ env.VERSION }}
+          ${{ env.REGISTRY }}/${{ env.IMAGE }}:latest
         build-args: |
             GIT_HEAD_COMMIT=${{ github.sha }}
             GIT_CURRENT_BRANCH=${{ github.ref }}

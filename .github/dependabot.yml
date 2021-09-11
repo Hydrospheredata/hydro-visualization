@@ -9,5 +9,8 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    ignore:
+      - dependency-name: "python"
+        versions: ["~>3.9"]
     labels:
       - "automerge"

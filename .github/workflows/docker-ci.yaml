@@ -129,4 +129,4 @@ jobs:
           workflow: Test compose
           token: ${{ secrets.HYDRO_SERVING_TOKEN }}
           repo: ${{ env.HYDRO_SERVING_REPO }}
-          inputs: '{"service_image_name":"${{ env.IMAGE }}", "registry_url":"${{ env.REGISTRY }}", "tag":"${{ env.TAG }}", "repository":"${{ github.repository }}",pr_number":"${{ github.event.pull_request.number }}"}'
+          inputs: '{"service_image_name":"${{ env.IMAGE }}", "registry_url":"${{ env.REGISTRY }}", "tag":"${{ env.TAG }}", "repository":"${{ github.repository }}", "pr_number":"${{ github.event.pull_request.number }}"}'

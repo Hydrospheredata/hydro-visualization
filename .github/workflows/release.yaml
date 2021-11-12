@@ -144,6 +144,7 @@ jobs:
       uses: docker/build-push-action@v2
       with:
         push: true
+        context: .
         builder: ${{ steps.buildx.outputs.name }}
         tags: |
           ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ env.VERSION }}

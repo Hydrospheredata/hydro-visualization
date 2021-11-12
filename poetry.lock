@@ -318,7 +318,7 @@ dotenv = ["python-dotenv"]
 
 [[package]]
 name = "flask-cors"
-version = "3.0.0"
+version = "3.0.9"
 description = "A Flask extension adding a decorator for CORS support"
 category = "main"
 optional = false
@@ -624,6 +624,7 @@ description = ""
 category = "main"
 optional = false
 python-versions = "*"
+develop = true
 
 [package.dependencies]
 numpy = "*"
@@ -1166,7 +1167,7 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "1.1"
 python-versions = "~3.8.9"
-content-hash = "ea9bc2d7635bd2b56865e80369186bb0fb87a5279e192d3bcffa04c955ed9138"
+content-hash = "d1e4d808f169f4bcd576bfc2d49f959e539853524eb5807722d033539f40291f"
 
 [metadata.files]
 amqp = [
@@ -1309,9 +1310,8 @@ flask = [
     {file = "Flask-1.1.1.tar.gz", hash = "sha256:13f9f196f330c7c2c5d7a5cf91af894110ca0215ac051b5844701f2bfd934d52"},
 ]
 flask-cors = [
-    {file = "Flask-Cors-3.0.0.tar.gz", hash = "sha256:dd1e27226594e18a710a70d08fb9522dfa3d9ec6d4fc4168480edc60d0897050"},
-    {file = "Flask_Cors-3.0.0-py2.7.egg", hash = "sha256:f30fadfbd5c7d2ba86e43580aa7be0c825c082d7eca70734908efde53e7330c8"},
-    {file = "Flask_Cors-3.0.0-py2.py3-none-any.whl", hash = "sha256:1580309003d0ba01ff744d30b98b8e908cc2fd1c958b407e652b181f91b2fac1"},
+    {file = "Flask-Cors-3.0.9.tar.gz", hash = "sha256:6bcfc100288c5d1bcb1dbb854babd59beee622ffd321e444b05f24d6d58466b8"},
+    {file = "Flask_Cors-3.0.9-py2.py3-none-any.whl", hash = "sha256:cee4480aaee421ed029eaa788f4049e3e26d15b5affb6a880dade6bafad38324"},
 ]
 fsspec = [
     {file = "fsspec-2021.7.0-py3-none-any.whl", hash = "sha256:86822ccf367da99957f49db64f7d5fd3d8d21444fac4dfdc8ebc38ee93d478c6"},

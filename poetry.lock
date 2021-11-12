@@ -435,7 +435,7 @@ protobuf = ">=3.6.0"
 
 [[package]]
 name = "hydro-serving-grpc"
-version = "3.0.2"
+version = "3.0.3"
 description = "Protobuf messages and GRPC API for Hydrosphere Serving platform"
 category = "main"
 optional = false
@@ -447,7 +447,7 @@ protobuf = ">=3.17.2,<4.0.0"
 
 [[package]]
 name = "hydrosdk"
-version = "3.0.2"
+version = "3.0.3"
 description = " This package's purpose is to provide a simple and convenient way of integrating user's workflow scripts with Serving API."
 category = "main"
 optional = false
@@ -455,7 +455,7 @@ python-versions = ">=3.6.2,<4.0.0"
 
 [package.dependencies]
 docker-image-py = ">=0.1.10,<0.2.0"
-hydro-serving-grpc = "3.0.2"
+hydro-serving-grpc = "3.0.3"
 importlib_metadata = ">=1.7.0,<2.0.0"
 numpy = "1.18.3"
 pandas = ">=1.1.5"
@@ -1166,7 +1166,7 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "1.1"
 python-versions = "~3.8.9"
-content-hash = "439203ee7b835637097c0841b7a959e6a326fa1cc9b516f0405e0d88ed377886"
+content-hash = "ea9bc2d7635bd2b56865e80369186bb0fb87a5279e192d3bcffa04c955ed9138"
 
 [metadata.files]
 amqp = [
@@ -1452,12 +1452,12 @@ grpcio-health-checking = [
     {file = "grpcio-health-checking-1.28.1.tar.gz", hash = "sha256:6d29a88cad605e7b5801050c636c4a4daa326f5dc140d8194bf3ceba418e7ce6"},
 ]
 hydro-serving-grpc = [
-    {file = "hydro_serving_grpc-3.0.2-py3-none-any.whl", hash = "sha256:8c35a93c4f532f65f24e241127ea2be4ffb293b44b2dbc0c9be225bb3f512ded"},
-    {file = "hydro_serving_grpc-3.0.2.tar.gz", hash = "sha256:b5f7ff824c8f09b0065203dd1f6ae104571dafc5ee940b4a3e5ee2c5c8961f3d"},
+    {file = "hydro_serving_grpc-3.0.3-py3-none-any.whl", hash = "sha256:a15d419eb6e75af0a100a368111fdef5c9da6817dd872cfc0fa7add419cc6d3a"},
+    {file = "hydro_serving_grpc-3.0.3.tar.gz", hash = "sha256:bbe2be4f910db49d41ee6f3cc82978db53b3bfd485d31ce83272a55e162138a2"},
 ]
 hydrosdk = [
-    {file = "hydrosdk-3.0.2-py3-none-any.whl", hash = "sha256:8e0fb759dda462d4a1fae6d2bdad70befb272e9439a160c273d4e8a1510786ea"},
-    {file = "hydrosdk-3.0.2.tar.gz", hash = "sha256:5b9cd1475587fbd2cf66b18c7a8cb661ee1524d38aa8935a4c109f1722d6ac97"},
+    {file = "hydrosdk-3.0.3-py3-none-any.whl", hash = "sha256:06d7f476ff13075abf47de133581b39d2a9deb01282456ffe4beca8d1e5b8acb"},
+    {file = "hydrosdk-3.0.3.tar.gz", hash = "sha256:c0187f38d76c2d8b995a41cabcab4208ebf7763347655f761b9736e3a765c82e"},
 ]
 idna = [
     {file = "idna-2.10-py2.py3-none-any.whl", hash = "sha256:b97d804b1e9b523befed77c48dacec60e6dcb0b5391d57af6a65a312a90648c0"},
